@@ -36,9 +36,9 @@ scripts/make-invite.mjs genera códigos de invitación
 
 ## Puesta en marcha
 
-1. **Repo:** crea `AdAstraCorporation/ad-astra-members` (público) y sube este proyecto:
+1. **Repo:** ya creado en `AdAstraCorporation/Membership`. Sitio: https://adastracorporation.github.io/Membership/
    ```
-   git remote add origin https://github.com/AdAstraCorporation/ad-astra-members.git
+   git remote add origin https://github.com/AdAstraCorporation/Membership.git
    git push -u origin main
    ```
 2. **Pages:** Settings → Pages → Source: **GitHub Actions**.

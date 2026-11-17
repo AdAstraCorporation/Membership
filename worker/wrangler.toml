@@ -3,7 +3,7 @@ main = "index.js"
 compatibility_date = "2026-11-01"
 
 [vars]
-GH_REPO = "AdAstraCorporation/ad-astra-members"
+GH_REPO = "AdAstraCorporation/Membership"
 GH_BRANCH = "main"
 ALLOWED_ORIGIN = "https://adastracorporation.github.io"
 
