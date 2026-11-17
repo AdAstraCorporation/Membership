@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Corporación Ad Astra">
+  <circle cx="50" cy="50" r="47" fill="#34373b"/>
+  <circle cx="50" cy="50" r="45" fill="none" stroke="#b9bdc0" stroke-width="4"/>
+  <circle cx="50" cy="50" r="40.5" fill="none" stroke="#b9bdc0" stroke-width="1" opacity=".5"/>
+  <g stroke="#d5d8da" stroke-width="1.8" stroke-linecap="round" fill="none">
+    <path d="M52 19 L27 39 L41 47 L74 55"/>
+    <path d="M52 19 L58 64 L70 77"/>
+    <path d="M41 47 L35 75 L58 64 L74 55"/>
+  </g>
+  <g fill="#e4e6e8">
+    <circle cx="52" cy="19" r="4"/>
+    <circle cx="27" cy="39" r="3.4"/>
+    <circle cx="41" cy="47" r="3.2"/>
+    <circle cx="74" cy="55" r="3.6"/>
+    <circle cx="58" cy="64" r="3"/>
+    <circle cx="35" cy="75" r="3.6"/>
+    <circle cx="70" cy="77" r="3.2"/>
+  </g>
+</svg>

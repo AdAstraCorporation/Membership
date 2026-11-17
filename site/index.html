@@ -4,21 +4,34 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Corporación Ad Astra · Miembros</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="cabecera">
-    <a class="marca" href="index.html"><span class="estrella">✦</span> Corporación Ad Astra</a>
+    <a class="marca" href="index.html"><img class="logo" src="logo.svg" alt=""> Corporación Ad Astra</a>
     <nav><a href="index.html" aria-current="page">Miembros</a><a href="registro.html">Registro</a></nav>
   </header>
 
   <section class="hero">
-    <p class="eyebrow">Registro de tripulación</p>
+    <img class="hero-logo" src="logo.svg" alt="">
+    <p class="eyebrow">Directorio de tripulación</p>
     <h1>Per aspera ad astra</h1>
     <p id="resumen" class="sub">Cargando tripulación…</p>
   </section>
 
-  <section id="crews" class="crews" aria-label="Crews"></section>
+  <section class="agrupaciones">
+    <div class="grupo">
+      <h2>Crews</h2>
+      <p class="ayuda">El equipo al que pertenece cada miembro.</p>
+      <div id="crews" class="chips"></div>
+    </div>
+    <div class="grupo">
+      <h2>Roles</h2>
+      <p class="ayuda">La función de cada miembro, independiente de su crew.</p>
+      <div id="roles" class="chips"></div>
+    </div>
+  </section>
 
   <section class="filtros" aria-label="Filtros">
     <input id="buscar" type="search" placeholder="Buscar por nombre o especie" aria-label="Buscar">
@@ -29,7 +42,7 @@
   <main id="lista" class="grid"></main>
   <p id="vacio" class="vacio" hidden>Ningún miembro coincide con el filtro.</p>
 
-  <footer class="pie">Corporación Ad Astra · directorio de fursonas</footer>
+  <footer class="pie">Corporación Ad Astra · Directorio de tripulación</footer>
   <script type="module" src="app.js"></script>
 </body>
 </html>

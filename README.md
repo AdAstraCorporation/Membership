@@ -22,6 +22,8 @@ registro.html ──POST──▶ Worker (Cloudflare) ──commit──▶ repo
 ```
 site/                  páginas: index (directorio), ficha (PNG/PDF), registro
 site/config.js         URL del Worker  ← EDITAR
+site/logo.svg|png      logo (SVG para la web, PNG para la credencial descargable)
+site/vendor/           html2canvas y qrcode-generator (MIT), sin depender de un CDN
 data/config.json       nombres y colores de crews, nombres de roles  ← EDITAR
 data/members/          una ficha por fursona (la escribe el Worker)
 data/invites/          códigos ya usados (los escribe el Worker)
