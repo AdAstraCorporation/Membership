@@ -7,12 +7,29 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>Corporación Ad Astra</h1>
-    <p>Directorio de miembros</p>
-    <a href="registro.html">Registrarse con código de invitación</a>
+  <header class="cabecera">
+    <a class="marca" href="index.html"><span class="estrella">✦</span> Corporación Ad Astra</a>
+    <nav><a href="index.html" aria-current="page">Miembros</a><a href="registro.html">Registro</a></nav>
   </header>
-  <main id="lista"></main>
-  <script src="app.js"></script>
+
+  <section class="hero">
+    <p class="eyebrow">Registro de tripulación</p>
+    <h1>Per aspera ad astra</h1>
+    <p id="resumen" class="sub">Cargando tripulación…</p>
+  </section>
+
+  <section id="crews" class="crews" aria-label="Crews"></section>
+
+  <section class="filtros" aria-label="Filtros">
+    <input id="buscar" type="search" placeholder="Buscar por nombre o especie" aria-label="Buscar">
+    <select id="f-crew" aria-label="Crew"><option value="">Todas las crews</option></select>
+    <select id="f-rol" aria-label="Rol"><option value="">Todos los roles</option></select>
+  </section>
+
+  <main id="lista" class="grid"></main>
+  <p id="vacio" class="vacio" hidden>Ningún miembro coincide con el filtro.</p>
+
+  <footer class="pie">Corporación Ad Astra · directorio de fursonas</footer>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

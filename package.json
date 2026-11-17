@@ -6,13 +6,8 @@
   "description": "Directorio de miembros de la Corporación Ad Astra",
   "scripts": {
     "build": "node scripts/build-site.mjs",
-    "register": "node scripts/register.mjs",
-    "invite": "node scripts/make-invite.mjs"
+    "invite": "node scripts/make-invite.mjs",
+    "serve": "node scripts/build-site.mjs && npx --yes serve _site"
   },
-  "dependencies": {
-    "sharp": "^0.33.5"
-  },
-  "engines": {
-    "node": ">=20"
-  }
+  "engines": { "node": ">=20" }
 }

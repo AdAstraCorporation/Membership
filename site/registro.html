@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Registro · Corporación Ad Astra</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="cabecera">
+    <a class="marca" href="index.html"><span class="estrella">✦</span> Corporación Ad Astra</a>
+    <nav><a href="index.html">Miembros</a><a href="registro.html" aria-current="page">Registro</a></nav>
+  </header>
+
+  <main class="registro">
+    <h1>Únete a la tripulación</h1>
+    <p class="sub">Necesitas un código de invitación. Cada código sirve una sola vez y ya define tu crew y tu rol.</p>
+
+    <form id="form" novalidate>
+      <label>Código de invitación
+        <input name="code" required autocomplete="off" spellcheck="false" placeholder="C3-R2-ABCD23.xxxxxxxx">
+        <small id="code-info" class="ayuda"></small>
+      </label>
+
+      <label>Nombre de tu fursona
+        <input name="nombre" required maxlength="60">
+      </label>
+
+      <label>Identificador (aparece en la dirección de tu ficha)
+        <input name="slug" required pattern="[a-z0-9][a-z0-9-]{1,38}[a-z0-9]" maxlength="40">
+        <small class="ayuda">Minúsculas, números y guiones. Se genera a partir del nombre.</small>
+      </label>
+
+      <div class="fila">
+        <label>Especie <input name="especie" required maxlength="60"></label>
+        <label><span>Pronombres <span class="opcional">(opcional)</span></span> <input name="pronombres" maxlength="30"></label>
+      </div>
+
+      <label>Descripción
+        <textarea name="descripcion" required maxlength="600" rows="5"></textarea>
+        <small class="ayuda"><span id="contador">0</span>/600</small>
+      </label>
+
+      <label>Imagen de tu fursona
+        <input name="foto" type="file" accept="image/*" required>
+        <small class="ayuda">Se reduce a 800 px antes de enviarla.</small>
+      </label>
+      <img id="preview" class="preview" alt="" hidden>
+
+      <label class="check">
+        <input name="permiso" type="checkbox" required>
+        La imagen es mía o tengo permiso de su autor para publicarla.
+      </label>
+      <label class="check">
+        <input name="publico" type="checkbox" required>
+        Entiendo que mi ficha será pública y que el historial del sitio conserva lo que publique.
+      </label>
+
+      <button class="boton" type="submit">Registrarme</button>
+      <p id="estado" class="estado" role="status"></p>
+    </form>
+  </main>
+
+  <script type="module" src="registro.js"></script>
+</body>
+</html>

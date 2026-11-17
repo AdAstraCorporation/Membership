@@ -1,0 +1,15 @@
+{
+  "crews": {
+    "C1": { "nombre": "Vanguardia", "color": "#f2c46d" },
+    "C2": { "nombre": "Cartógrafos", "color": "#6dd3f2" },
+    "C3": { "nombre": "Forja Estelar", "color": "#f2856d" },
+    "C4": { "nombre": "Navegantes", "color": "#a98df2" }
+  },
+  "roles": {
+    "R1": "Capitán",
+    "R2": "Piloto",
+    "R3": "Ingeniería",
+    "R4": "Exploración",
+    "R5": "Médico"
+  }
+}

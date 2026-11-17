@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ficha · Corporación Ad Astra</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="cabecera">
+    <a class="marca" href="index.html"><span class="estrella">✦</span> Corporación Ad Astra</a>
+    <nav><a href="index.html">Miembros</a><a href="registro.html">Registro</a></nav>
+  </header>
+
+  <main class="ficha-pagina">
+    <div id="ficha-contenedor"><p class="vacio">Cargando ficha…</p></div>
+    <div id="acciones" class="acciones" hidden>
+      <button id="png" class="boton">Descargar PNG</button>
+      <button id="pdf" class="boton secundario">Guardar como PDF</button>
+      <a class="boton secundario" href="index.html">Volver al directorio</a>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
+  <script type="module" src="ficha.js"></script>
+</body>
+</html>
