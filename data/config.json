@@ -1,9 +1,21 @@
 {
   "crews": {
-    "C1": { "nombre": "Vanguardia", "color": "#f2c46d" },
-    "C2": { "nombre": "Cartógrafos", "color": "#6dd3f2" },
-    "C3": { "nombre": "Forja Estelar", "color": "#f2856d" },
-    "C4": { "nombre": "Navegantes", "color": "#a98df2" }
+    "C1": {
+      "nombre": "Vanguardia",
+      "color": "#b5a27c"
+    },
+    "C2": {
+      "nombre": "Cartógrafos",
+      "color": "#7f98aa"
+    },
+    "C3": {
+      "nombre": "Forja Estelar",
+      "color": "#a8826f"
+    },
+    "C4": {
+      "nombre": "Navegantes",
+      "color": "#8d88a3"
+    }
   },
   "roles": {
     "R1": "Capitán",
