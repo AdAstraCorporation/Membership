@@ -1,0 +1,45 @@
+name: register
+
+on:
+  repository_dispatch:
+    types: [register]
+
+# Serializa los registros: uno a la vez, así no se pisan commits ni pushes.
+concurrency:
+  group: registro
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install --omit=dev
+
+      - name: Crear ficha e imagen
+        env:
+          CLIENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+        run: node scripts/register.mjs
+
+      - name: Commit y push
+        env:
+          # Se pasan como variables de entorno, nunca interpoladas en el script.
+          SLUG: ${{ github.event.client_payload.member.slug }}
+          NOMBRE: ${{ github.event.client_payload.member.nombre }}
+          CREW: ${{ github.event.client_payload.member.crew }}
+          ROL: ${{ github.event.client_payload.member.rol }}
+        run: |
+          git config user.name "ad-astra-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/members img
+          git commit -m "Alta de miembro: $SLUG" -m "Nombre: $NOMBRE · Crew: $CREW · Rol: $ROL"
+          git pull --rebase
+          git push

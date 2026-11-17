@@ -1,0 +1,12 @@
+body { font-family: system-ui, sans-serif; margin: 0; background: #0b0f1a; color: #e6e9f2; }
+header { padding: 2rem; text-align: center; }
+main { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); padding: 2rem; }
+.ficha { background: #151b2e; border-radius: 12px; padding: 1rem; }
+.ficha img { width: 100%; border-radius: 8px; }
+a { color: #8fb8ff; }
+
+@media print {
+  body { background: #fff; color: #000; }
+  header, button { display: none; }
+  .ficha { break-inside: avoid; border: 1px solid #000; }
+}
