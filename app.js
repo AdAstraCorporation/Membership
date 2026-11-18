@@ -13,7 +13,8 @@
 //   [1] banderas: bit0 líder · bit1 estilo libre · bit2 hay estilo de miembro ·
 //       bit3 texto comprimido · bits4-5 estilo de crew-1 · bits6-7 estilo de miembro-1
 //   [4] ID de crew (6 símbolos base32 = 30 bits)   [3] color RGB
-//   [2] emisión (días desde 2020-01-01)            [16] hash de la contraseña
+//   [2] emisión (días desde 2020-01-01)            [2] ingreso a la crew (días, se conserva al renovar)
+//   [16] hash de la contraseña
 //   [2] largo del texto + texto UTF-8 (nombre␟especie␟pronombres␟crew␟rol), deflate si ahorra
 //   por imagen: [1] tipo<<4 | formato  [2] largo  [n] bytes   (tipo 1 foto, 2 logo; formato 1 WebP, 2 JPEG)
 
@@ -21,9 +22,10 @@ const $ = (id) => document.getElementById(id);
 
 // Campos de la credencial y su largo máximo:
 // n nombre · e especie · p pronombres · c crew · i ID de crew · k color · r rol · a emisión · h hash de la crew
+// g fecha de ingreso a la crew (la primera; renovar no la cambia)
 // s estilo de la crew · l "1" si cada miembro puede elegir su estilo · y estilo elegido por el miembro
 // f "1" si es la credencial del líder (fundador): no vence
-const LIMITES = { n: 40, e: 40, p: 20, c: 30, i: 9, k: 7, r: 30, a: 10, h: 22, s: 1, l: 1, y: 1, f: 1 };
+const LIMITES = { n: 40, e: 40, p: 20, c: 30, i: 9, k: 7, r: 30, a: 10, g: 10, h: 22, s: 1, l: 1, y: 1, f: 1 };
 
 // Estilos de credencial: los colores de la muestra son [cabecera, franja, papel].
 const ESTILOS = {
@@ -100,7 +102,7 @@ const comprimir = (bytes) => transformar(bytes, new CompressionStream("deflate-r
 const descomprimir = (bytes) => transformar(bytes, new DecompressionStream("deflate-raw"));
 
 // ---------- Empaquetado binario ----------
-const VERSION = 3;
+const VERSION = 4; // la 3 (sin fecha de ingreso) se sigue leyendo
 const FORMATOS = { 1: "image/webp", 2: "image/jpeg", 4: "enlace" }; // el 3 (GIF) ya no se usa: el QR solo lleva imágenes fijas
 const CODIGO_FORMATO = { "image/webp": 1, "image/jpeg": 2, enlace: 4 };
 
@@ -230,9 +232,10 @@ async function empaquetar(d, { foto, logo } = {}) {
     ((Number(d.s) - 1) << 4) | ((hayY ? Number(d.y) - 1 : 0) << 6);
   const rgb = d.k.slice(1).match(/../g).map((h) => parseInt(h, 16));
   const dias = diasDe(d.a ?? hoy());
+  const ingreso = diasDe(d.g ?? d.a ?? hoy());
   const hash = d.h ? unb64u(d.h) : new Uint8Array(16);
   const partes = [
-    Uint8Array.of(VERSION, banderas, ...idABytes(d.i), ...rgb, dias >> 8, dias & 0xff),
+    Uint8Array.of(VERSION, banderas, ...idABytes(d.i), ...rgb, dias >> 8, dias & 0xff, ingreso >> 8, ingreso & 0xff),
     hash,
     Uint8Array.of(texto.length >> 8, texto.length & 0xff),
     texto,
@@ -255,20 +258,25 @@ function firmaValida(mime, b) {
 async function desempaquetar(texto) {
   if (texto.length > 4400) throw new Error("demasiado largo");
   const b = deBase43(texto);
-  if (b[0] !== VERSION || b.length < 29) throw new Error("versión desconocida");
+  // v3: versión(1) banderas(1) ID(4) color(3) emisión(2) = 11 · hash(16) · largo(2) = 29
+  // v4: igual, con ingreso(2) después de la emisión = 13 · hash(16) · largo(2) = 31
+  const v = b[0];
+  if (v !== 3 && v !== VERSION) throw new Error("versión desconocida");
+  const cab = v === 3 ? 11 : 13;
+  if (b.length < cab + 18) throw new Error("truncado");
   const banderas = b[1];
-  // cabecera: versión(1) banderas(1) ID(4) color(3) emisión(2) = 11 · hash(16) = 27 · largo(2) = 29
-  const largo = (b[27] << 8) | b[28];
-  if (29 + largo > b.length) throw new Error("truncado");
-  let t = b.slice(29, 29 + largo);
+  const largo = (b[cab + 16] << 8) | b[cab + 17];
+  if (cab + 18 + largo > b.length) throw new Error("truncado");
+  let t = b.slice(cab + 18, cab + 18 + largo);
   if (banderas & 8) t = await descomprimir(t);
   const [n, e, p, c, r] = new TextDecoder().decode(t).split(SEP);
-  const hash = b.slice(11, 27);
+  const hash = b.slice(cab, cab + 16);
   const crudo = {
     n, e, p, c, r,
     i: idDeBytes(b.slice(2, 6)),
     k: "#" + [...b.slice(6, 9)].map((x) => x.toString(16).padStart(2, "0")).join(""),
     a: fechaDeDias((b[9] << 8) | b[10]),
+    g: v === 3 ? "" : fechaDeDias((b[11] << 8) | b[12]),
     h: hash.some((x) => x) ? b64u(hash) : "",
     s: String(((banderas >> 4) & 3) + 1),
     l: banderas & 2 ? "1" : "",
@@ -277,7 +285,7 @@ async function desempaquetar(texto) {
   };
   const d = limpiar(crudo);
   const imgs = {};
-  let o = 29 + largo;
+  let o = cab + 18 + largo;
   while (o + 3 <= b.length) {
     const tipo = b[o] >> 4;
     const mime = FORMATOS[b[o] & 15];
@@ -300,6 +308,8 @@ function limpiar(o) {
   }
   if (!/^#[0-9a-f]{6}$/i.test(d.k ?? "")) d.k = COLOR_POR_DEFECTO;
   if (d.a && !/^\d{4}-\d{2}-\d{2}$/.test(d.a)) delete d.a;
+  if (d.g && !/^\d{4}-\d{2}-\d{2}$/.test(d.g)) delete d.g;
+  if (!d.g && d.a) d.g = d.a; // credenciales v3: el ingreso es la emisión
   if (d.h && !/^[\w-]{22}$/.test(d.h)) delete d.h;
   if (d.i && !/^CR-[A-Z2-9]{6}$/.test(d.i)) delete d.i;
   if (!ESTILOS[d.s]) d.s = "1";
@@ -516,6 +526,7 @@ async function credencial(d, { foto, logo }) {
           <dt>Crew</dt><dd>${esc(d.c)}</dd>
           <dt>Rol</dt><dd>${esc(d.r || "Tripulante")}</dd>
           <dt class="solo-descarga">ID</dt><dd class="solo-descarga" data-id-miembro></dd>
+          <dt>Ingreso</dt><dd>${esc(d.g || d.a || "")}</dd>
           <dt>Emisión</dt><dd>${esc(d.a || "")}</dd>
           <dt>Vence</dt><dd class="${venc ? "dato-vencido" : ""}">${esc(vence)}</dd>
         </dl>
@@ -851,7 +862,7 @@ function modoClave({ modo, d, logo, foto }) {
   $("clave-ayuda").textContent = fundar
     ? "Ponle nombre, color y contraseña. Se le asigna un ID propio, así que puede haber otra con el mismo nombre. Comparte la contraseña solo con quien quieras dentro: cualquier miembro puede invitar con el QR de su credencial."
     : modo === "renovar"
-      ? "Con la contraseña de la crew sacas una credencial nueva, válida por un año."
+      ? `Con la contraseña de la crew sacas una credencial nueva, válida por un año. Se conservan tus datos y la fecha en que entraste a la crew (${d.g || d.a}).`
       : "Escribe la contraseña que te pasó alguien de la crew.";
   estado("", false, "clave-estado");
   mostrar("clave");
@@ -894,11 +905,13 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   form.reset();
   if (previo) for (const k of ["n", "e", "p", "r"]) form[k].value = previo.d[k] ?? "";
   const emision = hoy();
+  // Al renovar se conserva la fecha en que entró a la crew por primera vez.
+  const ingreso = previo?.d.g || previo?.d.a || emision;
   $("crew-fija").textContent = crew.c;
   $("crew-id").textContent = ""; // el ID de la crew solo aparece en los archivos descargados
   $("fechas").textContent = lider
     ? `Emitida el ${emision}. Como eres el líder, no vence.`
-    : `Emitida el ${emision}. Vence el ${venceDe(emision)}.`;
+    : `${previo ? `En la crew desde el ${ingreso}. ` : ""}Emitida el ${emision}. Vence el ${venceDe(emision)}.`;
   if (lider && !form.r.value) form.r.value = "Líder";
   $("logo-heredado").hidden = !logoHeredado;
   for (const id of ["precarga-fotoEnlace", "precarga-logoEnlace"]) $(id).hidden = true;
@@ -1009,7 +1022,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   let turno = 0;
   async function pintar() {
     const mio = ++turno;
-    const crudo = { n: form.n.value, e: form.e.value, p: form.p.value, r: form.r.value, ...crew, a: emision };
+    const crudo = { n: form.n.value, e: form.e.value, p: form.p.value, r: form.r.value, ...crew, a: emision, g: ingreso };
     if (lider) crudo.f = "1"; // la marca de líder no está en `crew`, así que nadie la hereda
     if (libre) crudo.y = form.y.value;
     let d;

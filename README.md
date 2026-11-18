@@ -37,6 +37,9 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
 - **Vencimiento.** Las credenciales vencen al año de su emisión, salvo la del **líder** (quien
   fundó la crew), que es permanente. La marca de líder no se hereda al unirse. Una vencida muestra el
   sello *VENCIDA*, no sirve para invitar y se puede **renovar** con la contraseña.
+- **Renovar.** Se escanea la credencial vieja, se pulsa *Renovar* y se escribe la contraseña de
+  la crew. Sale una credencial nueva, válida por un año, con los mismos datos y la misma fecha de
+  **ingreso** (la primera vez que entró a la crew). Solo cambian la emisión y el vencimiento.
 - **Imágenes por enlace.** En vez de subir la foto o el logo se puede poner un enlace `https`.
   Entonces el QR guarda solo la dirección (unos pocos bytes en lugar de ~1,5 KB): mucho más
   liviano y la imagen se ve en su calidad original, GIF incluidos. Depende de que el enlace siga
@@ -70,7 +73,7 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
   permite (wsrv.nl ve la dirección de la imagen). En pantalla, al escanear y en el PDF se usa el
   enlace original. Si wsrv.nl no la obtiene, el PNG lleva el emblema y se avisa.
 - Bytes (v3, binario): cabecera de 29 bytes (banderas, ID de crew en 30 bits, color RGB,
-  emisión en días desde 2020, hash crudo de 16 bytes), textos separados por `␟` y comprimidos
+  emisión e ingreso en días desde 2020 (formato v4; las v3 se siguen leyendo), hash crudo de 16 bytes), textos separados por `␟` y comprimidos
   solo si ahorra, y por imagen `[tipo<<4|formato][largo][bytes]`.
 - Imágenes: presupuesto de ~1,4 KB entre las dos. Reescalado
   de alta calidad y bisección de la calidad para aprovecharlo; sin canal alfa ni metadatos
