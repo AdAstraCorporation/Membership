@@ -642,7 +642,9 @@ const cargarHtml2canvas = () =>
     document.head.append(sc);
   }));
 
-// Comprueba si cada imagen enlazada se puede copiar (CORS) y reemplaza las que no.
+// Para el PNG, cada imagen enlazada tiene que poder copiarse (CORS). Muchos sitios no lo
+// permiten (Google, X, etc.): en ese caso, solo para la descarga, la imagen se pide a través de
+// wsrv.nl, un servicio público de imágenes que sí lo permite. Si tampoco funciona, va el emblema.
 const sePuedeCopiar = (src) =>
   new Promise((ok) => {
     const i = new Image();
@@ -652,16 +654,30 @@ const sePuedeCopiar = (src) =>
     i.onerror = () => ok(false);
     i.src = src;
   });
-async function sinPermisoDeCopia(contenedor) {
+const viaWsrv = (src) => `https://wsrv.nl/?url=${encodeURIComponent(src)}&w=1200&we&output=png`;
+async function prepararImagenesExternas(contenedor) {
   const externas = [...contenedor.querySelectorAll("img")].filter((i) => /^https:/i.test(i.getAttribute("src") ?? ""));
-  let n = 0;
-  for (const img of externas) {
-    if (await sePuedeCopiar(img.src)) continue;
-    n++;
-    if (img.matches(".crew-logo")) img.replaceWith(Object.assign(document.createElement("div"), { className: "crew-logo crew-logo-generado" }));
-    else img.outerHTML = `<div class="cred-sinfoto"><img src="logo.png" alt=""><span>Imagen enlazada</span></div>`;
-  }
-  return n;
+  let sinImagen = 0;
+  await Promise.all(
+    externas.map(async (img) => {
+      const original = img.getAttribute("src");
+      if (await sePuedeCopiar(original)) {
+        img.crossOrigin = "anonymous";
+        return;
+      }
+      const alterna = viaWsrv(original);
+      if (await sePuedeCopiar(alterna)) {
+        img.crossOrigin = "anonymous";
+        img.src = alterna;
+        await img.decode().catch(() => null);
+        return;
+      }
+      sinImagen++;
+      if (img.matches(".crew-logo")) img.replaceWith(Object.assign(document.createElement("div"), { className: "crew-logo crew-logo-generado" }));
+      else img.outerHTML = `<div class="cred-sinfoto"><img src="logo.png" alt=""><span>Imagen enlazada</span></div>`;
+    })
+  );
+  return sinImagen;
 }
 
 // Descarga dos PNG individuales: frente y reverso.
@@ -684,7 +700,8 @@ async function descargarPng(boton) {
     await Promise.all([...copia.querySelectorAll("img")].map((i) => (i.complete ? null : i.decode().catch(() => null))));
     // Imágenes enlazadas cuyo sitio no permite copiarlas (sin CORS, como Google Fotos): en el
     // PNG van con el emblema en su lugar, en vez de dejar un hueco. El PDF sí las incluye.
-    const bloqueadas = await sinPermisoDeCopia(copia);
+    estado("Preparando las imágenes…");
+    const bloqueadas = await prepararImagenesExternas(copia);
     const [frente, reverso] = copia.querySelectorAll(".credencial");
     for (const [cara, sufijo] of [[frente, "frente"], [reverso, "reverso"]]) {
       const canvas = await window.html2canvas(cara, { scale: 3, backgroundColor: null, useCORS: true });
@@ -696,7 +713,7 @@ async function descargarPng(boton) {
     }
     estado(
       bloqueadas
-        ? "Listo: frente y reverso descargados. La imagen enlazada no salió en el PNG porque su sitio (Google Fotos, por ejemplo) no lo permite; en su lugar va el emblema. Si la quieres, guarda el PDF o sube el archivo."
+        ? "Listo: frente y reverso descargados. No pude traer la imagen enlazada para el PNG, así que va el emblema en su lugar. Si la quieres, guarda el PDF o sube el archivo."
         : "Listo: frente y reverso descargados."
     );
   } catch (e) {

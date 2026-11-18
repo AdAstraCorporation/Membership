@@ -35,7 +35,7 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
   activo, y el sitio que la aloja verá quién abre la credencial. Si además se sube el archivo,
   se usa solo para el PNG y el PDF. Quien se une hereda el enlace del logo de la crew.
 - **Aislado.** La Content-Security-Policy de `index.html` bloquea en el navegador cualquier
-  conexión fuera del sitio, salvo las imágenes `https` que el propio usuario enlaza.
+  conexión fuera del sitio, salvo las imágenes `https` que el propio usuario enlaza (y wsrv.nl al descargar el PNG).
 
 ## Detalles técnicos
 
@@ -56,8 +56,11 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
   - No sirven Instagram, Facebook, Threads, Discord, TikTok, Telegram ni iCloud: abren
     páginas y las direcciones de sus imágenes caducan (Discord, en unas 24 horas). La página
     lo explica y sugiere subir el archivo.
-- Imágenes cuyo sitio no permite copiarlas (sin CORS, como Google Fotos o Drive): se ven en
-  pantalla, al escanear y en el PDF; en el PNG van con el emblema en su lugar y se avisa.
+- Imágenes cuyo sitio no permite copiarlas (sin CORS, como Google, X y la mayoría de redes): el
+  navegador no deja que la página lea sus píxeles, así que **solo al descargar el PNG** se piden a
+  través de [wsrv.nl](https://wsrv.nl), un servicio público y gratuito de imágenes que sí lo
+  permite (wsrv.nl ve la dirección de la imagen). En pantalla, al escanear y en el PDF se usa el
+  enlace original. Si wsrv.nl no la obtiene, el PNG lleva el emblema y se avisa.
 - Bytes (v3, binario): cabecera de 29 bytes (banderas, ID de crew en 30 bits, color RGB,
   emisión en días desde 2020, hash crudo de 16 bytes), textos separados por `␟` y comprimidos
   solo si ahorra, y por imagen `[tipo<<4|formato][largo][bytes]`.
@@ -80,8 +83,8 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
 - Con foto y logo subidos como archivo el QR es denso (versión ~35); con enlaces es simple. Se lee bien desde la pantalla o impreso a
   buen tamaño; muy pequeño puede costar.
 - El vencimiento usa el reloj del dispositivo que escanea.
-- Una imagen enlazada solo sale en el PNG si su sitio permite CORS (Google no lo permite);
-  si no, el PNG lleva el emblema en su lugar. El PDF sí la incluye; subir el archivo también.
+- Para el PNG, las imágenes enlazadas sin CORS dependen de wsrv.nl; si no responde, el PNG lleva
+  el emblema. El PDF siempre las incluye; subir el archivo también lo resuelve.
 
 ## Archivos
 
