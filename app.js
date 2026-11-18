@@ -1,4 +1,5 @@
 // Generador de credenciales de la Corporación Ad Astra.
+// Funciona aislado: no llama a ningún servicio externo (lo refuerza la CSP de index.html).
 // Sin servidor ni base de datos: los datos viajan comprimidos en el fragmento
 // de la URL (#d=...), que es lo que lleva el QR. El fragmento no se envía al
 // servidor, así que GitHub Pages nunca recibe los datos.
@@ -6,7 +7,7 @@
 const $ = (id) => document.getElementById(id);
 const config = await fetch("config.json").then((r) => r.json());
 
-const LIMITES = { n: 40, e: 40, p: 20, c: 4, r: 4, a: 10, i: 300 };
+const LIMITES = { n: 40, e: 40, p: 20, c: 4, r: 4, a: 10, h: 22 };
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const nombreCrew = (id) => config.crews[id]?.nombre ?? id;
@@ -52,11 +53,28 @@ function limpiar(o) {
   for (const [k, max] of Object.entries(LIMITES)) {
     if (typeof o?.[k] === "string" && o[k].trim()) d[k] = o[k].trim().slice(0, max);
   }
-  if (d.i && !/^https:\/\//i.test(d.i)) delete d.i;
   if (d.a && !/^\d{4}-\d{2}-\d{2}$/.test(d.a)) delete d.a;
+  if (d.h && !/^[\w-]{22}$/.test(d.h)) delete d.h;
   if (!d.n) throw new Error("sin nombre");
   return d;
 }
+
+// ---------- Contraseña de la crew ----------
+// PBKDF2-SHA256, 210 000 iteraciones, sal = "ad-astra:<crew>", 16 bytes en base64url.
+// El hash viaja en el QR (campo h) y el oficial vive en config.json (crews.<id>.clave).
+async function hashClave(clave, crew) {
+  const llave = await crypto.subtle.importKey("raw", new TextEncoder().encode(clave.normalize("NFC")), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(`ad-astra:${crew}`), iterations: 210000 },
+    llave,
+    128
+  );
+  return b64u(new Uint8Array(bits));
+}
+
+const claveOficial = (crew) => config.crews[crew]?.clave || "";
+// Un QR puede invitar si lleva el hash vigente de su crew.
+const puedeInvitar = (d) => Boolean(d.h && d.c && d.h === claveOficial(d.c));
 
 const urlDe = (codigo) => `${location.origin}${location.pathname}#d=${codigo}`;
 
@@ -80,7 +98,7 @@ function qrDataUrl(texto) {
 async function credencial(d, { foto, url }) {
   const crew = nombreCrew(d.c);
   const rol = nombreRol(d.r);
-  const imagen = foto || d.i;
+  const imagen = foto; // solo la foto local; nada se carga de fuera
   const qr = qrDataUrl(url);
   return `
     <article id="credencial" class="credencial" style="--crew:${esc(colorCrew(d.c))}">
@@ -98,7 +116,7 @@ async function credencial(d, { foto, url }) {
       </div>
       <div class="cred-foto">
         ${imagen
-          ? `<img src="${esc(imagen)}" alt="${esc(d.n)}" referrerpolicy="no-referrer">`
+          ? `<img src="${esc(imagen)}" alt="${esc(d.n)}">`
           : `<div class="cred-sinfoto"><img src="logo.png" alt=""><span>Sin imagen</span></div>`}
       </div>
       <div class="cred-nombre">
@@ -118,7 +136,7 @@ async function credencial(d, { foto, url }) {
     </article>`;
 }
 
-// Si la imagen enlazada no carga, se muestra el marcador "sin imagen".
+// Si la imagen no carga, se muestra el marcador "sin imagen".
 function respaldoFoto(contenedor) {
   const img = contenedor.querySelector(".cred-foto > img");
   img?.addEventListener("error", () => {
@@ -134,13 +152,13 @@ async function descargarPng(boton) {
   if (!window.html2canvas) return estado("No se pudo cargar el generador de imágenes.", true);
   boton.disabled = true;
   try {
-    const canvas = await window.html2canvas($("credencial"), { scale: 3, backgroundColor: null, useCORS: true });
+    const canvas = await window.html2canvas($("credencial"), { scale: 3, backgroundColor: null });
     const a = document.createElement("a");
     a.download = `${nombreArchivo}.png`;
     a.href = canvas.toDataURL("image/png");
     a.click();
   } catch {
-    estado("No se pudo generar el PNG. Si usas un enlace de imagen, prueba subiendo la imagen desde tu equipo.", true);
+    estado("No se pudo generar el PNG.", true);
   } finally {
     boton.disabled = false;
   }
@@ -179,6 +197,12 @@ async function modoVer(codigo) {
     document.title = `${d.n} · Corporación Ad Astra`;
     $("vista-ver").innerHTML = await credencial(d, { url: urlDe(codigo) });
     respaldoFoto($("vista-ver"));
+    if (puedeInvitar(d)) {
+      $("boton-unirse").hidden = false;
+      $("boton-unirse").onclick = () => modoUnirse({ crew: d.c, h: d.h });
+    } else if (d.h) {
+      $("ver-aviso").textContent = "Credencial reconstruida a partir de su QR. Este QR ya no sirve para invitar: la contraseña de la crew cambió.";
+    }
     $("ver").hidden = false;
   } catch {
     $("error").hidden = false;
@@ -186,9 +210,10 @@ async function modoVer(codigo) {
 }
 
 // ---------- Modo crear ----------
-async function modoCrear() {
+async function modoCrear({ crew, h }) {
+  ocultarTodo();
   const form = $("form");
-  for (const [id, c] of Object.entries(config.crews)) form.c.add(new Option(c.nombre, id));
+  $("crew-fija").textContent = nombreCrew(crew);
   for (const [id, nombre] of Object.entries(config.roles)) form.r.add(new Option(nombre, id));
   const hoy = new Date();
   form.a.value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
@@ -204,7 +229,7 @@ async function modoCrear() {
   let turno = 0;
   async function pintar() {
     const mio = ++turno;
-    const crudo = Object.fromEntries(Object.keys(LIMITES).map((k) => [k, form[k]?.value ?? ""]));
+    const crudo = { ...Object.fromEntries(Object.keys(LIMITES).map((k) => [k, form[k]?.value ?? ""])), c: crew, h };
     let d;
     try {
       d = limpiar(crudo);
@@ -227,8 +252,64 @@ async function modoCrear() {
   pintar();
 }
 
-// ---------- Inicio ----------
+// ---------- Unirse (contraseña) ----------
+function ocultarTodo() {
+  for (const id of ["inicio", "unirse", "crear", "ver", "error"]) $(id).hidden = true;
+}
+
+// Con QR: la crew viene del QR. Sin QR (fundador): se elige la crew.
+function modoUnirse({ crew, h } = {}) {
+  ocultarTodo();
+  const form = $("form-unirse");
+  const fundador = !crew;
+  $("unirse-crew").hidden = !fundador;
+  if (fundador && !form.c.options.length) {
+    for (const [id, c] of Object.entries(config.crews)) if (c.clave) form.c.add(new Option(c.nombre, id));
+  }
+  const crewActual = () => (fundador ? form.c.value : crew);
+  const titulo = () => ($("unirse-titulo").textContent = fundador ? "Fundar credencial de crew" : `Crew ${nombreCrew(crew)}`);
+  titulo();
+  form.c.onchange = titulo;
+  $("unirse").hidden = false;
+  form.clave.value = "";
+  form.clave.focus();
+
+  let intentos = 0;
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const est = $("unirse-estado");
+    const c = crewActual();
+    const oficial = claveOficial(c);
+    if (!oficial) return (est.textContent = "Esta crew todavía no tiene contraseña configurada.");
+    if (h && h !== oficial) return (est.textContent = "Este QR ya no sirve para invitar.");
+    est.textContent = "Comprobando…";
+    est.classList.remove("error");
+    const boton = form.querySelector("button");
+    boton.disabled = true;
+    const ok = (await hashClave(form.clave.value, c)) === oficial;
+    // Pausa creciente tras cada fallo: solo frena intentos a mano desde la página.
+    if (!ok) await new Promise((r) => setTimeout(r, Math.min(++intentos, 5) * 600));
+    boton.disabled = false;
+    if (!ok) {
+      est.textContent = "Contraseña incorrecta.";
+      est.classList.add("error");
+      return;
+    }
+    modoCrear({ crew: c, h: oficial });
+  };
+}
+
+function modoInicio() {
+  ocultarTodo();
+  $("inicio").hidden = false;
+}
+
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-accion=fundar]")) modoUnirse();
+});
+
+// ---------- Arranque ----------
 const m = /^#d=([\w-]+)$/.exec(location.hash);
 if (m) modoVer(m[1]);
-else modoCrear();
+else modoInicio();
 window.addEventListener("hashchange", () => location.reload());

@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Sitio aislado: el navegador bloquea cualquier conexión fuera de este mismo sitio. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none'">
   <title>Credencial · Corporación Ad Astra</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
@@ -10,38 +12,64 @@
 <body>
   <header class="cabecera">
     <a class="marca" href="./"><img class="logo" src="logo.svg" alt=""> Corporación Ad Astra</a>
-    <nav><a id="nav-crear" href="./">Crear credencial</a></nav>
+    <nav><a href="./">Inicio</a></nav>
   </header>
 
-  <!-- Modo crear: formulario + vista previa -->
+  <!-- Inicio: cómo unirse -->
+  <main id="inicio" class="inicio" hidden>
+    <img class="inicio-logo" src="logo.svg" alt="">
+    <p class="eyebrow">Directorio de tripulación</p>
+    <h1>Per aspera ad astra</h1>
+    <p class="sub">Para unirte a una tripulación, escanea el QR de la credencial de uno de sus miembros
+      y escribe la contraseña de la crew que te den.</p>
+    <ol class="pasos">
+      <li>Escanea el QR de un miembro de la tripulación.</li>
+      <li>Pulsa <strong>Unirme a esta tripulación</strong> y escribe la contraseña.</li>
+      <li>Llena tus datos y descarga tu credencial. Tu QR también servirá para invitar.</li>
+    </ol>
+    <button class="boton secundario" data-accion="fundar">Soy fundador de una tripulación</button>
+  </main>
+
+  <!-- Unirse: contraseña de la crew -->
+  <main id="unirse" class="ver" hidden>
+    <form id="form-unirse" class="tarjeta-unirse" autocomplete="off">
+      <p class="eyebrow">Unirse a la tripulación</p>
+      <h2 id="unirse-titulo">Crew</h2>
+      <label id="unirse-crew" hidden>Crew <select name="c"></select></label>
+      <label>Contraseña de la crew
+        <input name="clave" type="password" required autocomplete="off">
+      </label>
+      <button class="boton" type="submit">Continuar</button>
+      <p id="unirse-estado" class="estado" role="status"></p>
+    </form>
+  </main>
+
+  <!-- Crear: formulario + vista previa -->
   <main id="crear" class="crear" hidden>
     <section class="panel-form">
       <p class="eyebrow">Directorio de tripulación</p>
       <h1>Tu credencial</h1>
-      <p class="sub">Llena tus datos y descarga tu identificación. Nada se guarda en ningún servidor:
-        el QR lleva tus datos y, al escanearlo, esta página reconstruye la credencial.</p>
+      <p class="sub">El sitio funciona aislado y no guarda nada: el QR lleva tus datos y, al escanearlo,
+        esta página reconstruye la credencial.</p>
 
       <form id="form" autocomplete="off">
+        <p class="crew-fija">Crew: <strong id="crew-fija"></strong></p>
         <label>Nombre de tu fursona <input name="n" required maxlength="40"></label>
         <div class="fila">
           <label>Especie <input name="e" required maxlength="40"></label>
           <label><span>Pronombres <span class="opcional">(opcional)</span></span> <input name="p" maxlength="20"></label>
         </div>
         <div class="fila">
-          <label>Crew <select name="c" required></select></label>
           <label>Rol <select name="r" required></select></label>
+          <label>Fecha de alta <input name="a" type="date" required></label>
         </div>
-        <label>Fecha de alta <input name="a" type="date" required></label>
 
         <fieldset>
           <legend>Imagen</legend>
-          <label>Desde tu equipo <span class="opcional">(se usa solo para el PNG y el PDF)</span>
+          <label>Desde tu equipo <span class="opcional">(opcional)</span>
             <input name="foto" type="file" accept="image/*">
-          </label>
-          <label>Enlace a la imagen <span class="opcional">(opcional: es la que aparece al escanear el QR)</span>
-            <input name="i" type="url" maxlength="300" placeholder="https://…">
-            <small class="ayuda">La imagen no cabe dentro del QR; si quieres que se vea al escanearlo,
-              súbela a un sitio público y pega aquí el enlace directo.</small>
+            <small class="ayuda">Solo aparece en tu PNG y tu PDF. No cabe en el QR, así que al escanearlo
+              la credencial se muestra con el emblema de la corporación.</small>
           </label>
         </fieldset>
       </form>
@@ -58,20 +86,20 @@
     </section>
   </main>
 
-  <!-- Modo ver: credencial reconstruida desde el QR -->
+  <!-- Ver: credencial reconstruida desde el QR -->
   <main id="ver" class="ver" hidden>
     <div id="vista-ver"></div>
     <div class="acciones">
-      <button class="boton" data-accion="png">Descargar PNG</button>
+      <button id="boton-unirse" class="boton" data-accion="unirse" hidden>Unirme a esta tripulación</button>
+      <button class="boton secundario" data-accion="png">Descargar PNG</button>
       <button class="boton secundario" data-accion="pdf">Guardar como PDF</button>
-      <a class="boton secundario" href="./">Crear mi credencial</a>
     </div>
-    <p class="aviso">Credencial reconstruida a partir de su QR. No se verifica contra ningún registro.</p>
+    <p id="ver-aviso" class="aviso">Credencial reconstruida a partir de su QR.</p>
   </main>
 
   <main id="error" class="ver" hidden>
     <p class="vacio">Este enlace no contiene una credencial válida.</p>
-    <a class="boton" href="./">Crear una credencial</a>
+    <a class="boton" href="./">Ir al inicio</a>
   </main>
 
   <script src="vendor/html2canvas.min.js" defer></script>

@@ -2,19 +2,23 @@
   "crews": {
     "C1": {
       "nombre": "Vanguardia",
-      "color": "#b5a27c"
+      "color": "#b5a27c",
+      "clave": "dHKNCzcQoVksNVnUyt7Kmw"
     },
     "C2": {
       "nombre": "Cartógrafos",
-      "color": "#7f98aa"
+      "color": "#7f98aa",
+      "clave": "9-8_G7DxZyQxg2vbc4YTeg"
     },
     "C3": {
       "nombre": "Forja Estelar",
-      "color": "#a8826f"
+      "color": "#a8826f",
+      "clave": "596BwetRlbEBM_1t7PutMw"
     },
     "C4": {
       "nombre": "Navegantes",
-      "color": "#8d88a3"
+      "color": "#8d88a3",
+      "clave": "WCFTj3QqYzRqrxhWaqbwAw"
     }
   },
   "roles": {
