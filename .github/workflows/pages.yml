@@ -24,6 +24,13 @@ jobs:
       url: ${{ steps.despliegue.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
+      # Versión por commit en app.js y style.css: tras cada publicación el navegador descarga
+      # los archivos nuevos en vez de usar los de la caché (GitHub Pages cachea ~10 min).
+      - name: Versionar recursos
+        run: |
+          v="${GITHUB_SHA::8}"
+          sed -i "s#src=\"app.js\"#src=\"app.js?v=$v\"#; s#href=\"style.css\"#href=\"style.css?v=$v\"#" index.html
+          grep -n "?v=$v" index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
