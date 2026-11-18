@@ -24,8 +24,10 @@
       <h2 id="clave-titulo"></h2>
       <p id="clave-id" class="id-crew"></p>
       <p id="clave-ayuda" class="ayuda"></p>
-      <p id="nota-unirse" class="ayuda nota-unirse" hidden>¿Tu crew ya existe? Pídele a alguien de ella que te muestre
-        el QR de su credencial y escanéalo.</p>
+      <div id="nota-unirse" class="nota-unirse" hidden>
+        <p class="ayuda">¿Tu crew ya existe? Escanea o sube el QR de la credencial de alguien de ella.</p>
+        <button type="button" class="boton secundario" data-accion="unirse-qr">Unirme a una crew</button>
+      </div>
       <div id="clave-fundar" class="grupo-campos" hidden>
         <label>Nombre de la crew <input name="crew" maxlength="30"></label>
         <label>Color
@@ -50,6 +52,24 @@
       <button class="boton" type="submit">Continuar</button>
       <p id="clave-estado" class="estado" role="status"></p>
     </form>
+  </main>
+
+  <!-- Unirse: leer el QR de un miembro con la cámara o desde una imagen -->
+  <main id="leer-qr" class="ver" hidden>
+    <div class="tarjeta-unirse">
+      <p class="eyebrow">Unirse a una crew</p>
+      <h2>El QR de un miembro</h2>
+      <p class="ayuda">Está en el reverso de su credencial. Puedes escanearlo con la cámara o subir una imagen
+        donde se vea, como el PNG del reverso o una captura de pantalla.</p>
+      <div class="opciones-qr">
+        <button type="button" id="qr-camara" class="boton">Usar la cámara</button>
+        <label class="boton secundario">Subir imagen del QR
+          <input id="qr-archivo" type="file" accept="image/*" hidden></label>
+      </div>
+      <video id="qr-video" class="qr-video" playsinline muted hidden></video>
+      <p id="qr-estado" class="estado" role="status"></p>
+      <button type="button" class="boton secundario" data-accion="volver-fundar">Volver</button>
+    </div>
   </main>
 
   <!-- Crear: formulario + vista previa -->

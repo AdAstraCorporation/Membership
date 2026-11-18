@@ -19,8 +19,10 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
   único posible); para unirse a una existente se escanea el QR de un miembro.
 - **Crews.** Cualquiera puede fundar una: nombre, color, estilo y contraseña. Recibe un
   **ID único** (`CR-XXXXXX`), así que dos crews con el mismo nombre son distintas.
-- **Unirse.** Se escanea el QR de un miembro, se pulsa *Unirme a esta tripulación* y se
-  escribe la contraseña de la crew. La credencial nueva hereda la crew (incluido su logo) y su
+- **Unirse.** Desde la página, *Unirme a una crew* permite escanear con la cámara el QR de un
+  miembro o subir una imagen donde se vea (el PNG del reverso, una captura). También se puede
+  escanear con la cámara del celular y pulsar *Unirme a esta tripulación*. Luego se escribe la
+  contraseña de la crew. La credencial nueva hereda la crew (incluido su logo) y su
   QR también puede invitar.
 - **Estilos.** Clásica, Nocturna, Minimal y Ceremonial. Los elige el fundador, que además
   decide si cada miembro puede escoger el suyo. Quien se une recibe el estilo de la crew.
@@ -64,7 +66,8 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
   (perfil de color, EXIF), que en miniaturas pesan más que la propia imagen.
 - El QR solo guarda imágenes fijas: un GIF subido como archivo se guarda con su primer cuadro.
   Las animaciones se ven únicamente con un enlace.
-- Carga: html2canvas (~200 KB) solo se descarga al pedir el PNG; qrcode va minificado.
+- Carga: html2canvas (~200 KB) solo se descarga al pedir el PNG, y jsQR (~130 KB) solo al
+  leer un QR sin lector nativo del navegador (BarcodeDetector); qrcode va minificado.
 - Contraseña: PBKDF2-SHA256, 210 000 iteraciones. La sal incluye el ID de la crew, su estilo
   y si los miembros pueden elegir estilo; alterar eso en un QR invalida la contraseña.
 - ID de miembro `AA-XXXX`: derivado de nombre, especie e ID de crew; no cambia al renovar.
@@ -87,7 +90,7 @@ index.html   página
 app.js       lógica: formularios, empaquetado, QR, estilos, PNG y PDF
 style.css    estilos de la página y de la credencial
 logo.png     emblema   favicon.png  icono
-vendor/      html2canvas y qrcode-generator minificado (MIT)
+vendor/      html2canvas, qrcode-generator (MIT) y jsQR (Apache-2.0), se cargan solo al usarse
 .github/workflows/pages.yml   publica la raíz en Pages en cada push a main
 ```
 

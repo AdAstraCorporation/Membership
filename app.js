@@ -714,7 +714,8 @@ document.addEventListener("click", async (e) => {
   const accion = b.dataset.accion;
   if (accion === "pdf") window.print();
   if (accion === "png") descargarPng(b);
-  if (accion === "fundar") modoClave({ modo: "fundar" });
+  if (accion === "fundar" || accion === "volver-fundar") modoClave({ modo: "fundar" });
+  if (accion === "unirse-qr") modoLeerQr();
   if (accion === "copiar") {
     try {
       await navigator.clipboard.writeText(urlActual);
@@ -726,7 +727,8 @@ document.addEventListener("click", async (e) => {
 });
 
 function mostrar(id) {
-  for (const s of ["clave", "crear", "ver", "error"]) $(s).hidden = s !== id;
+  for (const s of ["clave", "leer-qr", "crear", "ver", "error"]) $(s).hidden = s !== id;
+  if (id !== "leer-qr") detenerCamara();
   if (id !== "crear") $("vista-crear").innerHTML = "";
   window.scrollTo(0, 0);
 }
@@ -989,6 +991,127 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   };
   await prepararMiniaturas();
   pintar();
+}
+
+// ---------- Unirse: leer el QR de un miembro ----------
+// Lector nativo del navegador (BarcodeDetector) si existe; si no, jsQR, que se descarga solo aquí.
+let jsqrListo = null;
+const cargarJsqr = () =>
+  (jsqrListo ??= new Promise((ok, mal) => {
+    const sc = document.createElement("script");
+    sc.src = "vendor/jsqr.min.js";
+    sc.onload = ok;
+    sc.onerror = () => {
+      jsqrListo = null;
+      mal(new Error("no cargó"));
+    };
+    document.head.append(sc);
+  }));
+const detectorNativo = async () => {
+  try {
+    if ("BarcodeDetector" in window && (await BarcodeDetector.getSupportedFormats()).includes("qr_code"))
+      return new BarcodeDetector({ formats: ["qr_code"] });
+  } catch {
+    /* sin lector nativo */
+  }
+  return null;
+};
+
+// Lee un QR de una imagen o un cuadro de video. Devuelve el texto o "".
+async function leerQr(fuente, ancho, alto) {
+  const nativo = await detectorNativo();
+  if (nativo) {
+    try {
+      const r = await nativo.detect(fuente);
+      if (r[0]?.rawValue) return r[0].rawValue;
+    } catch {
+      /* se prueba con jsQR */
+    }
+  }
+  await cargarJsqr();
+  // jsQR trabaja con píxeles; las imágenes muy grandes se reducen para ir más rápido.
+  const k = Math.min(1, 1600 / Math.max(ancho, alto));
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(ancho * k);
+  cv.height = Math.round(alto * k);
+  const g = cv.getContext("2d", { willReadFrequently: true });
+  g.drawImage(fuente, 0, 0, cv.width, cv.height);
+  const px = g.getImageData(0, 0, cv.width, cv.height);
+  return window.jsQR(px.data, px.width, px.height, { inversionAttempts: "attemptBoth" })?.data ?? "";
+}
+
+// Del texto del QR saca los datos de la credencial y pasa a pedir la contraseña.
+async function unirseConTexto(texto) {
+  const m = /#C([0-9A-Z$*+\-./:]+)\s*$/.exec(texto ?? "");
+  if (!m) return estado("Ese QR no es de una credencial de Ad Astra.", true, "qr-estado");
+  let paquete;
+  try {
+    paquete = await desempaquetar(m[1]);
+  } catch {
+    return estado("Leí el QR, pero la credencial viene incompleta o dañada.", true, "qr-estado");
+  }
+  const { d } = paquete;
+  if (!d.h) return estado("Esa credencial no sirve para invitar.", true, "qr-estado");
+  if (vencida(d)) return estado(`Esa credencial venció el ${venceDe(d.a)}, así que ya no sirve para invitar. Pide el QR de otro miembro.`, true, "qr-estado");
+  detenerCamara();
+  modoClave({ modo: "unirse", d, logo: fuenteDe(paquete.logo) });
+}
+
+let camara = null;
+function detenerCamara() {
+  camara?.getTracks().forEach((t) => t.stop());
+  camara = null;
+  const v = $("qr-video");
+  if (v) {
+    v.srcObject = null;
+    v.hidden = true;
+  }
+}
+
+async function usarCamara() {
+  if (!navigator.mediaDevices?.getUserMedia) return estado("Este navegador no deja usar la cámara. Sube una imagen del QR.", true, "qr-estado");
+  try {
+    camara = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+  } catch {
+    return estado("No pude abrir la cámara. Revisa el permiso o sube una imagen del QR.", true, "qr-estado");
+  }
+  const v = $("qr-video");
+  v.srcObject = camara;
+  v.hidden = false;
+  await v.play().catch(() => {});
+  estado("Apunta al QR y mantenlo quieto un momento…", false, "qr-estado");
+  const flujo = camara;
+  while (camara === flujo) {
+    await new Promise((r) => setTimeout(r, 300));
+    if (camara !== flujo || !v.videoWidth) continue;
+    const texto = await leerQr(v, v.videoWidth, v.videoHeight).catch(() => "");
+    if (texto && camara === flujo) {
+      await unirseConTexto(texto);
+      if (camara === flujo) await new Promise((r) => setTimeout(r, 1500)); // QR ajeno: se sigue intentando
+    }
+  }
+}
+
+function modoLeerQr() {
+  estado("", false, "qr-estado");
+  $("qr-archivo").value = "";
+  mostrar("leer-qr");
+  $("qr-camara").onclick = usarCamara;
+  $("qr-archivo").onchange = async () => {
+    const f = $("qr-archivo").files[0];
+    if (!f) return;
+    detenerCamara();
+    estado("Leyendo el QR…", false, "qr-estado");
+    try {
+      const bmp = await createImageBitmap(f);
+      const texto = await leerQr(bmp, bmp.width, bmp.height);
+      bmp.close();
+      if (!texto) return estado("No encontré un QR en esa imagen. Prueba con una más nítida o más cerca.", true, "qr-estado");
+      await unirseConTexto(texto);
+    } catch {
+      estado("No pude abrir esa imagen.", true, "qr-estado");
+    }
+  };
 }
 
 // ---------- Arranque ----------

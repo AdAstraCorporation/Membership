@@ -231,7 +231,11 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 .calidad-qr figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: .3rem; }
 .calidad-qr img { width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; border-radius: 6px; border: 1px solid var(--borde); background: #ecebe6; }
 .calidad-qr figcaption { font-size: .75rem; color: var(--tenue); text-align: center; max-width: 120px; }
-.nota-unirse { margin: 0; padding-bottom: .9rem; border-bottom: 1px solid var(--borde); }
+.nota-unirse { display: flex; flex-direction: column; align-items: flex-start; gap: .6rem; padding-bottom: 1rem; border-bottom: 1px solid var(--borde); }
+.nota-unirse p { margin: 0; }
+.opciones-qr { display: flex; flex-wrap: wrap; gap: .6rem; }
+.opciones-qr label.boton { display: inline-flex; flex-direction: row; font-weight: 600; cursor: pointer; }
+.qr-video { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; border: 1px solid var(--borde); background: #000; }
 /* Sin scroll horizontal: los fieldset no se encogen por defecto y la credencial no debe pasar del ancho */
 html, body { overflow-x: clip; }
 fieldset { min-width: 0; }
@@ -243,8 +247,9 @@ fieldset { min-width: 0; }
   .caras { padding: 0; }
   .cabecera { padding: .9rem 1rem; }
 }
+.tarjeta-unirse { display: flex; flex-direction: column; gap: 1.1rem; }
 .tarjeta-unirse p { margin: 0; }
-.tarjeta-unirse h2 { margin: .2rem 0 0; }
+.tarjeta-unirse h2 { margin: -.6rem 0 0; }
 .grupo-campos { display: flex; flex-direction: column; gap: 1rem; }
 
 /* Muestras de estilo en pantallas angostas: 2 columnas */
