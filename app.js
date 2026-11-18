@@ -36,8 +36,11 @@ const estiloDe = (d) => (d.l === "1" && ESTILOS[d.y] ? d.y : d.s);
 const COLOR_POR_DEFECTO = "#b5a27c";
 
 // Presupuesto de bytes para las imágenes dentro del QR (más bytes = QR más denso).
+// Con un GIF animado el presupuesto sube (el QR queda más denso, cerca del máximo).
 const PRESUPUESTO_LOGO = 380;
+const PRESUPUESTO_LOGO_ANIMADO = 900;
 const PRESUPUESTO_IMAGENES = 1450;
+const PRESUPUESTO_IMAGENES_ANIMADAS = 2350;
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -100,8 +103,8 @@ const descomprimir = (bytes) => transformar(bytes, new DecompressionStream("defl
 
 // ---------- Empaquetado binario ----------
 const VERSION = 3;
-const FORMATOS = { 1: "image/webp", 2: "image/jpeg" };
-const CODIGO_FORMATO = { "image/webp": 1, "image/jpeg": 2 };
+const FORMATOS = { 1: "image/webp", 2: "image/jpeg", 3: "image/gif" };
+const CODIGO_FORMATO = { "image/webp": 1, "image/jpeg": 2, "image/gif": 3 };
 const SEP = "\x1f"; // separador de los textos
 const EPOCA = Date.UTC(2020, 0, 1);
 const DIA = 864e5;
@@ -164,6 +167,7 @@ async function empaquetar(d, { foto, logo } = {}) {
 function firmaValida(mime, b) {
   if (mime === "image/webp") return b.length > 12 && texto4(b, 0) === "RIFF" && texto4(b, 8) === "WEBP";
   if (mime === "image/jpeg") return b[0] === 0xff && b[1] === 0xd8;
+  if (mime === "image/gif") return b.length > 6 && texto4(b, 0) === "GIF8";
   return false;
 }
 
@@ -300,6 +304,16 @@ async function comprimirImagen(bmp, calidad) {
 // presupuesto. Se queda con el tamaño más grande que logra una calidad aceptable.
 const CALIDAD_ACEPTABLE = 0.35;
 async function miniatura(fuente, presupuesto, { cuadrado }) {
+  if (fuente.type === "image/gif") {
+    const bytes = new Uint8Array(await fuente.arrayBuffer());
+    if (bytes.length <= presupuesto && firmaValida("image/gif", bytes)) return { mime: "image/gif", bytes }; // ya cabe tal cual
+    const cuadros = await cuadrosDeGif(fuente);
+    if (cuadros) {
+      const gif = await gifMiniatura(cuadros, presupuesto, cuadrado);
+      cuadros.forEach((c) => c.bmp.close());
+      if (gif) return gif;
+    }
+  }
   const base = await createImageBitmap(fuente);
   let respaldo = null;
   for (const lado of [160, 144, 128, 112, 96, 80, 64, 48, 32]) {
@@ -317,6 +331,187 @@ async function miniatura(fuente, presupuesto, { cuadrado }) {
     respaldo ??= mejor; // cabe, pero con calidad baja: se usa solo si ningún tamaño lo hace mejor
   }
   return respaldo;
+}
+
+// ---------- GIF animado ----------
+// Se decodifica cuadro a cuadro con ImageDecoder (WebCodecs) y se vuelve a codificar con un
+// encoder GIF propio: menos tamaño, menos cuadros y paleta reducida, guardando en cada cuadro
+// solo los píxeles que cambian (el resto, transparente). Sin ImageDecoder se usa el 1.er cuadro.
+async function cuadrosDeGif(fuente) {
+  if (!("ImageDecoder" in window)) return null;
+  const dec = new ImageDecoder({ data: await fuente.arrayBuffer(), type: "image/gif" });
+  try {
+    await dec.tracks.ready;
+    const total = Math.min(dec.tracks.selectedTrack.frameCount, 120);
+    if (total < 2) return null;
+    const cuadros = [];
+    for (let i = 0; i < total; i++) {
+      const { image } = await dec.decode({ frameIndex: i });
+      cuadros.push({ bmp: await createImageBitmap(image), ms: Math.max(20, (image.duration ?? 100000) / 1000) });
+      image.close();
+    }
+    return cuadros;
+  } catch {
+    return null;
+  } finally {
+    dec.close();
+  }
+}
+
+// Compresión LZW de GIF (mismo esquema que los encoders de referencia).
+function lzwGif(indices, minimo) {
+  const limpiarCodigo = 1 << minimo;
+  const fin = limpiarCodigo + 1;
+  let tam = minimo + 1;
+  let siguiente = fin + 1;
+  let tabla = new Map();
+  const out = [];
+  let acc = 0;
+  let bits = 0;
+  const emitir = (codigo) => {
+    acc |= codigo << bits;
+    bits += tam;
+    while (bits >= 8) {
+      out.push(acc & 255);
+      acc >>>= 8;
+      bits -= 8;
+    }
+  };
+  emitir(limpiarCodigo);
+  let prefijo = indices[0];
+  for (let i = 1; i < indices.length; i++) {
+    const k = indices[i];
+    const clave = prefijo * 256 + k;
+    const hallado = tabla.get(clave);
+    if (hallado !== undefined) {
+      prefijo = hallado;
+      continue;
+    }
+    emitir(prefijo);
+    if (siguiente < 4096) {
+      if (siguiente === 1 << tam) tam++;
+      tabla.set(clave, siguiente++);
+    } else {
+      emitir(limpiarCodigo);
+      tabla = new Map();
+      tam = minimo + 1;
+      siguiente = fin + 1;
+    }
+    prefijo = k;
+  }
+  emitir(prefijo);
+  emitir(fin);
+  if (bits > 0) out.push(acc & 255);
+  return out;
+}
+
+// Paleta por popularidad (cubos de 4 bits por canal) + índice 0 reservado a "transparente".
+function paletaDe(pixeles, colores) {
+  const cuenta = new Map();
+  for (const px of pixeles)
+    for (let i = 0; i < px.length; i += 4) {
+      const c = ((px[i] >> 4) << 8) | ((px[i + 1] >> 4) << 4) | (px[i + 2] >> 4);
+      const v = cuenta.get(c);
+      if (v) {
+        v[0]++;
+        v[1] += px[i];
+        v[2] += px[i + 1];
+        v[3] += px[i + 2];
+      } else cuenta.set(c, [1, px[i], px[i + 1], px[i + 2]]);
+    }
+  const top = [...cuenta.values()].sort((a, b) => b[0] - a[0]).slice(0, colores - 1);
+  return [[0, 0, 0], ...top.map(([n, r, g, b]) => [Math.round(r / n), Math.round(g / n), Math.round(b / n)])];
+}
+
+function cercano(paleta, r, g, b) {
+  let mejor = 1;
+  let dist = Infinity;
+  for (let i = 1; i < paleta.length; i++) {
+    const [pr, pg, pb] = paleta[i];
+    const d = (pr - r) ** 2 * 3 + (pg - g) ** 2 * 4 + (pb - b) ** 2 * 2;
+    if (d < dist) [dist, mejor] = [d, i];
+  }
+  return mejor;
+}
+
+function codificarGif(pixeles, w, h, colores, retrasoCs) {
+  const paleta = paletaDe(pixeles, colores);
+  const bitsPaleta = Math.max(1, Math.ceil(Math.log2(paleta.length)));
+  while (paleta.length < 1 << bitsPaleta) paleta.push([0, 0, 0]);
+  const memo = new Map();
+  const bytes = [...new TextEncoder().encode("GIF89a"), w & 255, w >> 8, h & 255, h >> 8, 0x80 | (bitsPaleta - 1), 0, 0];
+  for (const [r, g, b] of paleta) bytes.push(r, g, b);
+  bytes.push(0x21, 0xff, 11, ...new TextEncoder().encode("NETSCAPE2.0"), 3, 1, 0, 0, 0); // repetir siempre
+  const minimo = Math.max(2, bitsPaleta);
+  let previo = null;
+  for (const px of pixeles) {
+    const idx = new Uint8Array(w * h);
+    for (let p = 0, i = 0; p < idx.length; p++, i += 4) {
+      const c = (px[i] << 16) | (px[i + 1] << 8) | px[i + 2];
+      let v = memo.get(c);
+      if (v === undefined) memo.set(c, (v = cercano(paleta, px[i], px[i + 1], px[i + 2])));
+      idx[p] = v;
+    }
+    let datos = idx;
+    if (previo) {
+      // Solo lo que cambia: lo igual al cuadro anterior va como índice 0 (transparente).
+      datos = idx.map((v, p) => (v === previo[p] ? 0 : v));
+    }
+    bytes.push(0x21, 0xf9, 4, previo ? 0x05 : 0x04, retrasoCs & 255, retrasoCs >> 8, 0, 0); // conservar cuadro anterior
+    bytes.push(0x2c, 0, 0, 0, 0, w & 255, w >> 8, h & 255, h >> 8, 0, minimo);
+    const lzw = lzwGif(datos, minimo);
+    for (let i = 0; i < lzw.length; i += 255) {
+      const trozo = lzw.slice(i, i + 255);
+      bytes.push(trozo.length, ...trozo);
+    }
+    bytes.push(0);
+    previo = idx;
+  }
+  bytes.push(0x3b);
+  return Uint8Array.from(bytes);
+}
+
+async function pixelesDe(bmp) {
+  const cv = new OffscreenCanvas(bmp.width, bmp.height);
+  const g = cv.getContext("2d", { willReadFrequently: true });
+  g.fillStyle = "#ecebe6";
+  g.fillRect(0, 0, bmp.width, bmp.height);
+  g.drawImage(bmp, 0, 0);
+  return g.getImageData(0, 0, bmp.width, bmp.height).data;
+}
+
+// Busca el GIF animado que cabe en el presupuesto. Prioriza la fluidez: primero exige al
+// menos 6 cuadros (bajando el tamaño si hace falta); si nada cabe, prueba con 4, 3 y 2.
+const OPCIONES_GIF = [[12, 32], [10, 16], [8, 16], [6, 16], [8, 8], [6, 8], [4, 8], [3, 8], [2, 8]]; // [cuadros, colores]
+async function gifMiniatura(cuadros, presupuesto, cuadrado) {
+  // Foto: prima la fluidez. Logo (no cuadrado): prima la nitidez del ícono.
+  const minimos = cuadrado ? [6, 4, 3, 2] : [3, 2];
+  const totalMs = cuadros.reduce((t, c) => t + c.ms, 0);
+  const escalados = new Map();
+  const escalado = async (i, lado) => {
+    const clave = `${i}:${lado}`;
+    if (!escalados.has(clave)) escalados.set(clave, await escalar(cuadros[i].bmp, lado, cuadrado));
+    return escalados.get(clave);
+  };
+  for (const minimo of minimos) {
+    for (const lado of [96, 80, 72, 64, 56, 48, 40, 32]) {
+      for (const [n, colores] of OPCIONES_GIF) {
+        const cantidad = Math.min(n, cuadros.length);
+        if (cantidad < Math.min(minimo, cuadros.length)) continue;
+        const elegidos = Array.from({ length: cantidad }, (_, i) => Math.floor((i * cuadros.length) / cantidad));
+        const bmps = await Promise.all(elegidos.map((i) => escalado(i, lado)));
+        const pixeles = await Promise.all(bmps.map(pixelesDe));
+        const retraso = Math.max(2, Math.round(totalMs / cantidad / 10));
+        const bytes = codificarGif(pixeles, bmps[0].width, bmps[0].height, colores, retraso);
+        if (bytes.length <= presupuesto) {
+          escalados.forEach((b) => b.close());
+          return { mime: "image/gif", bytes };
+        }
+      }
+    }
+  }
+  escalados.forEach((b) => b.close());
+  return null;
 }
 
 const blobDe = (img) => (img ? new Blob([img.bytes], { type: img.mime }) : null);
@@ -654,8 +849,12 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   async function prepararMiniaturas() {
     const mia = ++versionMini;
     try {
-      const logoNuevo = logoFuente ? await miniatura(logoFuente, PRESUPUESTO_LOGO, { cuadrado: false }) : null;
-      const resto = PRESUPUESTO_IMAGENES - (logoNuevo?.bytes.length ?? 0);
+      const animado = [fotoFuente, logoFuente].some((f) => f?.type === "image/gif");
+      const logoAnimado = logoFuente?.type === "image/gif";
+      const logoNuevo = logoFuente
+        ? await miniatura(logoFuente, logoAnimado ? PRESUPUESTO_LOGO_ANIMADO : PRESUPUESTO_LOGO, { cuadrado: false })
+        : null;
+      const resto = (animado ? PRESUPUESTO_IMAGENES_ANIMADAS : PRESUPUESTO_IMAGENES) - (logoNuevo?.bytes.length ?? 0);
       const fotoNueva = fotoFuente ? await miniatura(fotoFuente, resto, { cuadrado: true }) : null;
       if (mia !== versionMini) return false;
       [miniLogo, miniFoto] = [logoNuevo, fotoNueva];
