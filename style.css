@@ -87,7 +87,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--acento); ou
 .cred-sinfoto span { color: #8c919b; font-size: .72rem; letter-spacing: .25em; text-transform: uppercase; }
 
 /* Páginas */
-.crear { display: grid; grid-template-columns: minmax(300px, 1fr) auto; gap: 3rem; max-width: 1320px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; align-items: start; }
+.crear { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3rem; max-width: 1320px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; align-items: start; }
 .panel-form .sub { margin: .2rem 0 1.8rem; line-height: 1.55; }
 .panel-vista { position: sticky; top: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 1.2rem; }
 .ver { display: flex; flex-direction: column; align-items: center; gap: 1.2rem; padding: 2.5rem 1rem 4rem; }
@@ -103,7 +103,7 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 .estado { min-height: 1.5em; margin: 0; text-align: center; color: var(--tenue); word-break: break-all; }
 .estado.error { color: #d08a80; }
 @media (max-width: 1240px) {
-  .crear { grid-template-columns: 1fr; }
+  .crear { grid-template-columns: minmax(0, 1fr); }
   .panel-vista { position: static; }
 }
 @media (max-width: 560px) { .fila { grid-template-columns: 1fr; } }
@@ -190,9 +190,10 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 .estilo-4 .cred-rol { font-style: italic; }
 
 /* Muestras de estilo en los formularios */
-.muestras { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; }
-.muestra { display: flex; flex-direction: column; align-items: center; gap: .35rem; cursor: pointer; font-size: .78rem; font-weight: 400; color: var(--tenue); }
-.muestra input { position: absolute; opacity: 0; pointer-events: none; }
+.muestras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+.muestra span { max-width: 100%; text-align: center; }
+.muestra { position: relative; display: flex; flex-direction: column; align-items: center; gap: .35rem; cursor: pointer; font-size: .78rem; font-weight: 400; color: var(--tenue); }
+.muestra input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
 .muestra i { width: 100%; aspect-ratio: .62; border-radius: 6px; border: 2px solid transparent; display: block;
   background: linear-gradient(var(--a) 0 22%, var(--b) 22% 30%, var(--c) 30% 88%, var(--a) 88%); }
 .muestra input:checked + i { border-color: var(--acento); }
@@ -231,4 +232,23 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 .calidad-qr img { width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; border-radius: 6px; border: 1px solid var(--borde); background: #ecebe6; }
 .calidad-qr figcaption { font-size: .75rem; color: var(--tenue); text-align: center; max-width: 120px; }
 .nota-unirse { margin: 0; padding-bottom: .9rem; border-bottom: 1px solid var(--borde); }
+/* Sin scroll horizontal: los fieldset no se encogen por defecto y la credencial no debe pasar del ancho */
+html, body { overflow-x: clip; }
+fieldset { min-width: 0; }
+.crear > *, .panel-vista, .ver > * { min-width: 0; max-width: 100%; }
+.caras { max-width: 100%; }
+@media (max-width: 560px) {
+  .crear { padding: 1.5rem 1rem 3rem; gap: 2rem; }
+  .ver { padding: 1.5rem .75rem 3rem; }
+  .caras { padding: 0; }
+  .cabecera { padding: .9rem 1rem; }
+}
+.tarjeta-unirse p { margin: 0; }
+.tarjeta-unirse h2 { margin: .2rem 0 0; }
 .grupo-campos { display: flex; flex-direction: column; gap: 1rem; }
+
+/* Muestras de estilo en pantallas angostas: 2 columnas */
+@media (max-width: 440px) {
+  .muestras { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem .6rem; }
+  .muestra i { aspect-ratio: 1.3; }
+}
