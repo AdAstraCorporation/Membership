@@ -201,9 +201,18 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 .check { flex-direction: row; align-items: flex-start; gap: .6rem; font-weight: 400; }
 .check input { width: auto; margin-top: .25rem; }
 
+/* Al escanear: solo el frente en pantalla. El reverso sigue en la página (fuera de vista)
+   para que el PNG y el PDF lo incluyan. */
+.solo-frente { position: relative; }
+.solo-frente .cred-reverso { position: absolute; left: -10000px; top: 0; bottom: 0; }
+
+/* Copia temporal para generar los PNG, fuera de pantalla */
+.captura { position: fixed; left: -10000px; top: 0; }
+
 /* PDF: una cara por página */
 @media print {
   .caras { display: block; padding: 0; }
+  .solo-frente .cred-reverso { position: static; }
   .caras .credencial { break-after: page; page-break-after: always; margin: 0 auto; }
   .caras .credencial:last-child { break-after: auto; page-break-after: auto; }
 }

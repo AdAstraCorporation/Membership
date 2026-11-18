@@ -2,8 +2,9 @@
 
 Sitio estático en GitHub Pages: https://adastracorporation.github.io/Membership/
 
-Toma datos y genera la credencial en **PNG** (frente y reverso) o **PDF** (A6, una cara por
-página). No guarda nada y funciona aislado: no consume ningún servicio externo.
+Toma datos y genera la credencial en **PNG** (dos archivos: frente y reverso) o **PDF** (A6,
+una cara por página). Al escanear un QR, la vista muestra solo el frente; las descargas
+incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún servicio externo.
 
 ## Cómo funciona
 

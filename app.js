@@ -738,22 +738,44 @@ const cargarHtml2canvas = () =>
     document.head.append(sc);
   }));
 
+// Descarga dos PNG individuales: frente y reverso.
+const descargar = (url, nombre) => Object.assign(document.createElement("a"), { href: url, download: nombre }).click();
 async function descargarPng(boton) {
   boton.disabled = true;
+  let capa = null;
   try {
     await cargarHtml2canvas();
     const caras = document.querySelector("main:not([hidden]) .caras"); // la credencial de la pantalla visible
     if (!caras) return;
     const externas = [...caras.querySelectorAll("img")].some((i) => /^https:/i.test(i.getAttribute("src") ?? ""));
-    const canvas = await window.html2canvas(caras, { scale: 3, backgroundColor: null, useCORS: true });
-    if (externas) estado("Si alguna imagen enlazada no aparece en el PNG, su sitio no permite copiarla (CORS). Sube el archivo para el PNG.");
-    const a = document.createElement("a");
-    a.download = `${nombreArchivo}.png`;
-    a.href = canvas.toDataURL("image/png");
-    a.click();
-  } catch {
+    // Copia fija de la credencial: si la vista se vuelve a dibujar mientras se generan los PNG
+    // (una imagen que termina de cargar, el usuario que sigue escribiendo), no afecta la captura.
+    capa = document.createElement("div");
+    capa.className = "captura";
+    const copia = caras.cloneNode(true);
+    copia.classList.remove("solo-frente");
+    capa.append(copia);
+    document.body.append(capa);
+    await Promise.all([...copia.querySelectorAll("img")].map((i) => (i.complete ? null : i.decode().catch(() => null))));
+    const [frente, reverso] = copia.querySelectorAll(".credencial");
+    for (const [cara, sufijo] of [[frente, "frente"], [reverso, "reverso"]]) {
+      const canvas = await window.html2canvas(cara, { scale: 3, backgroundColor: null, useCORS: true });
+      const blob = await new Promise((r) => canvas.toBlob(r, "image/png"));
+      const url = URL.createObjectURL(blob);
+      descargar(url, `${nombreArchivo}-${sufijo}.png`);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      await new Promise((r) => setTimeout(r, 400)); // pausa entre descargas: algunos navegadores bloquean dos seguidas
+    }
+    estado(
+      externas
+        ? "Se descargaron el frente y el reverso. Si alguna imagen enlazada no aparece, su sitio no permite copiarla (CORS): sube el archivo."
+        : "Se descargaron el frente y el reverso."
+    );
+  } catch (e) {
+    console.error("PNG:", e);
     estado("No se pudo generar el PNG.", true);
   } finally {
+    capa?.remove();
     boton.disabled = false;
   }
 }
@@ -798,12 +820,14 @@ async function modoVer(datos) {
   urlActual = base() + datos;
   document.title = `${d.n} · Corporación Ad Astra`;
   const q = generarQr(base(), datos);
+  // Al escanear se muestra solo el frente; el reverso queda fuera de pantalla para las descargas.
   $("vista-ver").innerHTML = await credencial(d, {
     foto: srcDe(fotoBlob),
     logo: srcDe(logoBlob),
     qr: q && qrImagen(q),
   });
   respaldoImagenes($("vista-ver"));
+  $("vista-ver").querySelector(".caras").classList.add("solo-frente");
 
   const venc = vencida(d);
   $("boton-unirse").hidden = !d.h || venc;
