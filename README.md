@@ -12,7 +12,7 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
   calidad al escanear; la página lo avisa y muestra el tamaño real y cómo se verá. Con un
   enlace se conserva la calidad original.
 - **Todo va en el QR.** El QR del reverso contiene la credencial completa: datos, foto y
-  logo de la crew (estos dos como miniaturas WebP de unos 100–160 px, o **GIF animados**). Al escanearlo, la página
+  logo de la crew (estos dos como miniaturas WebP fijas de unos 100–160 px). Al escanearlo, la página
   la reconstruye. El sitio no recibe nada: los datos van en el fragmento `#C…` del enlace,
   que el navegador no envía al servidor.
 - **Entrada.** La página abre directamente el formulario para fundar una crew (sin QR es lo
@@ -59,13 +59,11 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
 - Bytes (v3, binario): cabecera de 29 bytes (banderas, ID de crew en 30 bits, color RGB,
   emisión en días desde 2020, hash crudo de 16 bytes), textos separados por `␟` y comprimidos
   solo si ahorra, y por imagen `[tipo<<4|formato][largo][bytes]`.
-- Imágenes: presupuesto de ~1,4 KB entre las dos (~2,3 KB si hay GIF animado). Reescalado
+- Imágenes: presupuesto de ~1,4 KB entre las dos. Reescalado
   de alta calidad y bisección de la calidad para aprovecharlo; sin canal alfa ni metadatos
   (perfil de color, EXIF), que en miniaturas pesan más que la propia imagen.
-- GIF animado: se decodifica con `ImageDecoder` y se recodifica con un encoder GIF propio
-  (paleta reducida, menos cuadros, y en cada cuadro solo los píxeles que cambian). La foto
-  prima la fluidez; el logo, la nitidez. Sin `ImageDecoder` (algunos Safari) se usa el
-  primer cuadro. El PNG y el PDF muestran un cuadro.
+- El QR solo guarda imágenes fijas: un GIF subido como archivo se guarda con su primer cuadro.
+  Las animaciones se ven únicamente con un enlace.
 - Carga: html2canvas (~200 KB) solo se descarga al pedir el PNG; qrcode va minificado.
 - Contraseña: PBKDF2-SHA256, 210 000 iteraciones. La sal incluye el ID de la crew, su estilo
   y si los miembros pueden elegir estilo; alterar eso en un QR invalida la contraseña.
@@ -76,7 +74,7 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
 - Es un control social, no de seguridad: todo ocurre en el navegador y el hash de la
   contraseña va en cada QR. Alguien con conocimientos técnicos puede saltárselo, y una
   contraseña corta se puede adivinar por fuerza bruta. Usa frases largas.
-- Con foto y logo el QR es denso (versión ~35, cerca de 40 con GIF animados). Se lee bien desde la pantalla o impreso a
+- Con foto y logo subidos como archivo el QR es denso (versión ~35); con enlaces es simple. Se lee bien desde la pantalla o impreso a
   buen tamaño; muy pequeño puede costar.
 - El vencimiento usa el reloj del dispositivo que escanea.
 - Una imagen enlazada solo sale en el PNG si su sitio permite CORS (Google no lo permite);

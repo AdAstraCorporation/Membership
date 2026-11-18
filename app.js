@@ -36,11 +36,9 @@ const estiloDe = (d) => (d.l === "1" && ESTILOS[d.y] ? d.y : d.s);
 const COLOR_POR_DEFECTO = "#b5a27c";
 
 // Presupuesto de bytes para las imágenes dentro del QR (más bytes = QR más denso).
-// Con un GIF animado el presupuesto sube (el QR queda más denso, cerca del máximo).
+// El QR guarda solo imágenes fijas. Las animaciones (GIF) se ven únicamente con un enlace.
 const PRESUPUESTO_LOGO = 380;
-const PRESUPUESTO_LOGO_ANIMADO = 900;
 const PRESUPUESTO_IMAGENES = 1450;
-const PRESUPUESTO_IMAGENES_ANIMADAS = 2350;
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -103,8 +101,8 @@ const descomprimir = (bytes) => transformar(bytes, new DecompressionStream("defl
 
 // ---------- Empaquetado binario ----------
 const VERSION = 3;
-const FORMATOS = { 1: "image/webp", 2: "image/jpeg", 3: "image/gif", 4: "enlace" };
-const CODIGO_FORMATO = { "image/webp": 1, "image/jpeg": 2, "image/gif": 3, enlace: 4 };
+const FORMATOS = { 1: "image/webp", 2: "image/jpeg", 4: "enlace" }; // el 3 (GIF) ya no se usa: el QR solo lleva imágenes fijas
+const CODIGO_FORMATO = { "image/webp": 1, "image/jpeg": 2, enlace: 4 };
 
 // Imagen por enlace: el QR guarda solo la dirección (https, sin espacios ni comillas).
 const ENLACE_RE = /^https:\/\/[^\s"'<>\\]{3,500}$/i;
@@ -159,27 +157,27 @@ function normalizarEnlace(valor) {
 // imagen, así que con un enlace de publicación se guía al usuario para copiar la dirección
 // directa de la imagen, y se avisa cuando la plataforma hace caducar esas direcciones.
 //   motivo: qué pasa · abrir: mostrar botón para abrir el enlace · pista: qué copiar
-const COPIAR = "Ábrela, mantén pulsada la imagen (celular) o haz clic derecho (computador), elige «Copiar dirección de la imagen» y pega aquí ese enlace";
+const COPIAR = "Ábrela, mantén pulsada la imagen (o clic derecho en el computador), toca «Copiar dirección de la imagen» y pégala aquí";
 const REGLAS_ENLACES = [
   // No sirven: páginas sin imagen accesible o direcciones que caducan
-  [/^https:\/\/((www|share)\.)?icloud\.com\//i, { motivo: "Los enlaces de iCloud abren una página y las direcciones de sus fotos caducan pronto, así que la credencial se rompería. Sube el archivo o compártela desde Google Drive o Google Fotos." }],
-  [/^https:\/\/([\w-]+\.)*(cdninstagram\.com|fbcdn\.net)\//i, { motivo: "Las direcciones de imágenes de Instagram y Facebook caducan, así que la credencial se rompería. Sube el archivo." }],
-  [/^https:\/\/((www|m|web)\.)?(instagram\.com|instagr\.am|facebook\.com|fb\.com|fb\.watch|threads\.net|threads\.com)\//i, { motivo: "Instagram, Facebook y Threads no permiten usar sus imágenes fuera de la app y sus direcciones caducan. Sube el archivo." }],
-  [/^https:\/\/(cdn|media)\.discordapp\.(com|net)\//i, { motivo: "Los enlaces de imágenes de Discord caducan en unas 24 horas, así que la credencial se rompería. Sube el archivo." }],
-  [/^https:\/\/((www|ptb|canary)\.)?(discord\.com|discord\.gg|discordapp\.com)\//i, { motivo: "Los enlaces de imágenes de Discord caducan en unas 24 horas, así que la credencial se rompería. Sube el archivo." }],
-  [/^https:\/\/((www|vm|vt|m)\.)?tiktok\.com\//i, { motivo: "TikTok no permite usar sus imágenes fuera de la app. Sube el archivo." }],
-  [/^https:\/\/(t\.me|telegram\.me|web\.telegram\.org)\//i, { motivo: "Telegram no ofrece enlaces directos a imágenes. Sube el archivo." }],
-  [/^https:\/\/drive\.google\.com\/drive\/(u\/\d+\/)?folders\//i, { motivo: "Ese enlace es de una carpeta de Google Drive. Abre la imagen, usa Compartir → Copiar enlace y pega el enlace del archivo." }],
+  [/^https:\/\/((www|share)\.)?icloud\.com\//i, { motivo: "iCloud no deja enlazar sus fotos: los enlaces caducan a las pocas horas. Sube el archivo, o comparte la foto desde Google Drive o Google Fotos." }],
+  [/^https:\/\/([\w-]+\.)*(cdninstagram\.com|fbcdn\.net)\//i, { motivo: "Las imágenes de Instagram y Facebook caducan al poco tiempo, y tu credencial se quedaría sin foto. Mejor sube el archivo." }],
+  [/^https:\/\/((www|m|web)\.)?(instagram\.com|instagr\.am|facebook\.com|fb\.com|fb\.watch|threads\.net|threads\.com)\//i, { motivo: "Instagram, Facebook y Threads no dejan usar sus imágenes fuera de la app. Mejor sube el archivo." }],
+  [/^https:\/\/(cdn|media)\.discordapp\.(com|net)\//i, { motivo: "Los enlaces de Discord dejan de funcionar al día siguiente. Mejor sube el archivo." }],
+  [/^https:\/\/((www|ptb|canary)\.)?(discord\.com|discord\.gg|discordapp\.com)\//i, { motivo: "Los enlaces de Discord dejan de funcionar al día siguiente. Mejor sube el archivo." }],
+  [/^https:\/\/((www|vm|vt|m)\.)?tiktok\.com\//i, { motivo: "TikTok no deja usar sus imágenes fuera de la app. Mejor sube el archivo." }],
+  [/^https:\/\/(t\.me|telegram\.me|web\.telegram\.org)\//i, { motivo: "Telegram no da enlaces a sus imágenes. Mejor sube el archivo." }],
+  [/^https:\/\/drive\.google\.com\/drive\/(u\/\d+\/)?folders\//i, { motivo: "Ese enlace es de una carpeta. Abre la imagen en Drive, toca Compartir → Copiar enlace y pega ese." }],
   // Sirven, pero el enlace es de una página: se guía para copiar la imagen directa
-  [/^https:\/\/(photos\.app\.goo\.gl|goo\.gl\/photos|photos\.google\.com)\//i, { motivo: "Ese enlace abre la página de Google Fotos, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://lh3.googleusercontent.com/. El álbum debe seguir compartido.` }],
-  [/^https:\/\/((www|mobile)\.)?(x\.com|twitter\.com)\//i, { motivo: "Ese enlace abre la publicación de X, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://pbs.twimg.com/.` }],
-  [/^https:\/\/((www|old|new)\.)?(reddit\.com|redd\.it)\//i, { motivo: "Ese enlace abre la publicación de Reddit, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://i.redd.it/.` }],
-  [/^https:\/\/(([\w-]+\.)?pinterest\.[a-z.]+|pin\.it)\//i, { motivo: "Ese enlace abre el pin de Pinterest, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://i.pinimg.com/.` }],
-  [/^https:\/\/(www\.)?bsky\.app\//i, { motivo: "Ese enlace abre la publicación de Bluesky, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://cdn.bsky.app/.` }],
-  [/^https:\/\/([\w-]+\.)?tumblr\.com\//i, { motivo: "Ese enlace abre la publicación de Tumblr, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://64.media.tumblr.com/.` }],
-  [/^https:\/\/(www\.)?furaffinity\.net\//i, { motivo: "Ese enlace abre la página de Fur Affinity, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://d.furaffinity.net/.` }],
-  [/^https:\/\/(www\.)?deviantart\.com\//i, { motivo: "Ese enlace abre la página de DeviantArt, no la imagen.", abrir: true, pista: `${COPIAR}. Algunas imágenes de DeviantArt llevan un permiso temporal; si deja de verse, sube el archivo.` }],
-  [/^https:\/\/(www\.)?imgur\.com\/(a|gallery|t)\//i, { motivo: "Ese enlace es de un álbum de Imgur.", abrir: true, pista: `${COPIAR}: empieza por https://i.imgur.com/.` }],
+  [/^https:\/\/(photos\.app\.goo\.gl|goo\.gl\/photos|photos\.google\.com)\//i, { motivo: "Ese enlace lleva a la página de Google Fotos. Hace falta la dirección de la imagen.", abrir: true, pista: `${COPIAR}. Empieza por https://lh3.googleusercontent.com/, y el álbum tiene que seguir compartido.` }],
+  [/^https:\/\/((www|mobile)\.)?(x\.com|twitter\.com)\//i, { motivo: "Ese enlace lleva a la publicación de X. Hace falta la dirección de la imagen.", abrir: true, pista: `${COPIAR}. Empieza por https://pbs.twimg.com/.` }],
+  [/^https:\/\/((www|old|new)\.)?(reddit\.com|redd\.it)\//i, { motivo: "Ese enlace lleva a la publicación de Reddit. Hace falta la dirección de la imagen.", abrir: true, pista: `${COPIAR}. Empieza por https://i.redd.it/.` }],
+  [/^https:\/\/(([\w-]+\.)?pinterest\.[a-z.]+|pin\.it)\//i, { motivo: "Ese enlace lleva al pin de Pinterest. Hace falta la dirección de la imagen.", abrir: true, pista: `${COPIAR}. Empieza por https://i.pinimg.com/.` }],
+  [/^https:\/\/(www\.)?bsky\.app\//i, { motivo: "Ese enlace lleva a la publicación de Bluesky. Hace falta la dirección de la imagen.", abrir: true, pista: `${COPIAR}. Empieza por https://cdn.bsky.app/.` }],
+  [/^https:\/\/([\w-]+\.)?tumblr\.com\//i, { motivo: "Ese enlace lleva a la publicación de Tumblr. Hace falta la dirección de la imagen.", abrir: true, pista: `${COPIAR}. Empieza por https://64.media.tumblr.com/.` }],
+  [/^https:\/\/(www\.)?furaffinity\.net\//i, { motivo: "Ese enlace lleva a la página de Fur Affinity. Hace falta la dirección de la imagen.", abrir: true, pista: `${COPIAR}. Empieza por https://d.furaffinity.net/.` }],
+  [/^https:\/\/(www\.)?deviantart\.com\//i, { motivo: "Ese enlace lleva a la página de DeviantArt. Hace falta la dirección de la imagen.", abrir: true, pista: `${COPIAR}. Algunas imágenes de DeviantArt dejan de verse con el tiempo; si te pasa, sube el archivo.` }],
+  [/^https:\/\/(www\.)?imgur\.com\/(a|gallery|t)\//i, { motivo: "Ese enlace es de un álbum de Imgur. Hace falta la dirección de una imagen.", abrir: true, pista: `${COPIAR}. Empieza por https://i.imgur.com/.` }],
 ];
 function revisarEnlace(valor) {
   const v = (valor ?? "").trim();
@@ -250,7 +248,6 @@ async function empaquetar(d, { foto, logo } = {}) {
 function firmaValida(mime, b) {
   if (mime === "image/webp") return b.length > 12 && texto4(b, 0) === "RIFF" && texto4(b, 8) === "WEBP";
   if (mime === "image/jpeg") return b[0] === 0xff && b[1] === 0xd8;
-  if (mime === "image/gif") return b.length > 6 && texto4(b, 0) === "GIF8";
   if (mime === "enlace") return enlaceValido(new TextDecoder().decode(b));
   return false;
 }
@@ -389,16 +386,7 @@ async function comprimirImagen(bmp, calidad) {
 // presupuesto. Se queda con el tamaño más grande que logra una calidad aceptable.
 const CALIDAD_ACEPTABLE = 0.35;
 async function miniatura(fuente, presupuesto, { cuadrado }) {
-  if (fuente.type === "image/gif") {
-    const bytes = new Uint8Array(await fuente.arrayBuffer());
-    if (bytes.length <= presupuesto && firmaValida("image/gif", bytes)) return { mime: "image/gif", bytes }; // ya cabe tal cual
-    const cuadros = await cuadrosDeGif(fuente);
-    if (cuadros) {
-      const gif = await gifMiniatura(cuadros, presupuesto, cuadrado);
-      cuadros.forEach((c) => c.bmp.close());
-      if (gif) return gif;
-    }
-  }
+  // Un GIF se guarda como imagen fija (su primer cuadro).
   const base = await createImageBitmap(fuente);
   let respaldo = null;
   for (const lado of [160, 144, 128, 112, 96, 80, 64, 48, 32]) {
@@ -416,187 +404,6 @@ async function miniatura(fuente, presupuesto, { cuadrado }) {
     respaldo ??= mejor; // cabe, pero con calidad baja: se usa solo si ningún tamaño lo hace mejor
   }
   return respaldo;
-}
-
-// ---------- GIF animado ----------
-// Se decodifica cuadro a cuadro con ImageDecoder (WebCodecs) y se vuelve a codificar con un
-// encoder GIF propio: menos tamaño, menos cuadros y paleta reducida, guardando en cada cuadro
-// solo los píxeles que cambian (el resto, transparente). Sin ImageDecoder se usa el 1.er cuadro.
-async function cuadrosDeGif(fuente) {
-  if (!("ImageDecoder" in window)) return null;
-  const dec = new ImageDecoder({ data: await fuente.arrayBuffer(), type: "image/gif" });
-  try {
-    await dec.tracks.ready;
-    const total = Math.min(dec.tracks.selectedTrack.frameCount, 120);
-    if (total < 2) return null;
-    const cuadros = [];
-    for (let i = 0; i < total; i++) {
-      const { image } = await dec.decode({ frameIndex: i });
-      cuadros.push({ bmp: await createImageBitmap(image), ms: Math.max(20, (image.duration ?? 100000) / 1000) });
-      image.close();
-    }
-    return cuadros;
-  } catch {
-    return null;
-  } finally {
-    dec.close();
-  }
-}
-
-// Compresión LZW de GIF (mismo esquema que los encoders de referencia).
-function lzwGif(indices, minimo) {
-  const limpiarCodigo = 1 << minimo;
-  const fin = limpiarCodigo + 1;
-  let tam = minimo + 1;
-  let siguiente = fin + 1;
-  let tabla = new Map();
-  const out = [];
-  let acc = 0;
-  let bits = 0;
-  const emitir = (codigo) => {
-    acc |= codigo << bits;
-    bits += tam;
-    while (bits >= 8) {
-      out.push(acc & 255);
-      acc >>>= 8;
-      bits -= 8;
-    }
-  };
-  emitir(limpiarCodigo);
-  let prefijo = indices[0];
-  for (let i = 1; i < indices.length; i++) {
-    const k = indices[i];
-    const clave = prefijo * 256 + k;
-    const hallado = tabla.get(clave);
-    if (hallado !== undefined) {
-      prefijo = hallado;
-      continue;
-    }
-    emitir(prefijo);
-    if (siguiente < 4096) {
-      if (siguiente === 1 << tam) tam++;
-      tabla.set(clave, siguiente++);
-    } else {
-      emitir(limpiarCodigo);
-      tabla = new Map();
-      tam = minimo + 1;
-      siguiente = fin + 1;
-    }
-    prefijo = k;
-  }
-  emitir(prefijo);
-  emitir(fin);
-  if (bits > 0) out.push(acc & 255);
-  return out;
-}
-
-// Paleta por popularidad (cubos de 4 bits por canal) + índice 0 reservado a "transparente".
-function paletaDe(pixeles, colores) {
-  const cuenta = new Map();
-  for (const px of pixeles)
-    for (let i = 0; i < px.length; i += 4) {
-      const c = ((px[i] >> 4) << 8) | ((px[i + 1] >> 4) << 4) | (px[i + 2] >> 4);
-      const v = cuenta.get(c);
-      if (v) {
-        v[0]++;
-        v[1] += px[i];
-        v[2] += px[i + 1];
-        v[3] += px[i + 2];
-      } else cuenta.set(c, [1, px[i], px[i + 1], px[i + 2]]);
-    }
-  const top = [...cuenta.values()].sort((a, b) => b[0] - a[0]).slice(0, colores - 1);
-  return [[0, 0, 0], ...top.map(([n, r, g, b]) => [Math.round(r / n), Math.round(g / n), Math.round(b / n)])];
-}
-
-function cercano(paleta, r, g, b) {
-  let mejor = 1;
-  let dist = Infinity;
-  for (let i = 1; i < paleta.length; i++) {
-    const [pr, pg, pb] = paleta[i];
-    const d = (pr - r) ** 2 * 3 + (pg - g) ** 2 * 4 + (pb - b) ** 2 * 2;
-    if (d < dist) [dist, mejor] = [d, i];
-  }
-  return mejor;
-}
-
-function codificarGif(pixeles, w, h, colores, retrasoCs) {
-  const paleta = paletaDe(pixeles, colores);
-  const bitsPaleta = Math.max(1, Math.ceil(Math.log2(paleta.length)));
-  while (paleta.length < 1 << bitsPaleta) paleta.push([0, 0, 0]);
-  const memo = new Map();
-  const bytes = [...new TextEncoder().encode("GIF89a"), w & 255, w >> 8, h & 255, h >> 8, 0x80 | (bitsPaleta - 1), 0, 0];
-  for (const [r, g, b] of paleta) bytes.push(r, g, b);
-  bytes.push(0x21, 0xff, 11, ...new TextEncoder().encode("NETSCAPE2.0"), 3, 1, 0, 0, 0); // repetir siempre
-  const minimo = Math.max(2, bitsPaleta);
-  let previo = null;
-  for (const px of pixeles) {
-    const idx = new Uint8Array(w * h);
-    for (let p = 0, i = 0; p < idx.length; p++, i += 4) {
-      const c = (px[i] << 16) | (px[i + 1] << 8) | px[i + 2];
-      let v = memo.get(c);
-      if (v === undefined) memo.set(c, (v = cercano(paleta, px[i], px[i + 1], px[i + 2])));
-      idx[p] = v;
-    }
-    let datos = idx;
-    if (previo) {
-      // Solo lo que cambia: lo igual al cuadro anterior va como índice 0 (transparente).
-      datos = idx.map((v, p) => (v === previo[p] ? 0 : v));
-    }
-    bytes.push(0x21, 0xf9, 4, previo ? 0x05 : 0x04, retrasoCs & 255, retrasoCs >> 8, 0, 0); // conservar cuadro anterior
-    bytes.push(0x2c, 0, 0, 0, 0, w & 255, w >> 8, h & 255, h >> 8, 0, minimo);
-    const lzw = lzwGif(datos, minimo);
-    for (let i = 0; i < lzw.length; i += 255) {
-      const trozo = lzw.slice(i, i + 255);
-      bytes.push(trozo.length, ...trozo);
-    }
-    bytes.push(0);
-    previo = idx;
-  }
-  bytes.push(0x3b);
-  return Uint8Array.from(bytes);
-}
-
-async function pixelesDe(bmp) {
-  const cv = new OffscreenCanvas(bmp.width, bmp.height);
-  const g = cv.getContext("2d", { willReadFrequently: true });
-  g.fillStyle = "#ecebe6";
-  g.fillRect(0, 0, bmp.width, bmp.height);
-  g.drawImage(bmp, 0, 0);
-  return g.getImageData(0, 0, bmp.width, bmp.height).data;
-}
-
-// Busca el GIF animado que cabe en el presupuesto. Prioriza la fluidez: primero exige al
-// menos 6 cuadros (bajando el tamaño si hace falta); si nada cabe, prueba con 4, 3 y 2.
-const OPCIONES_GIF = [[12, 32], [10, 16], [8, 16], [6, 16], [8, 8], [6, 8], [4, 8], [3, 8], [2, 8]]; // [cuadros, colores]
-async function gifMiniatura(cuadros, presupuesto, cuadrado) {
-  // Foto: prima la fluidez. Logo (no cuadrado): prima la nitidez del ícono.
-  const minimos = cuadrado ? [6, 4, 3, 2] : [3, 2];
-  const totalMs = cuadros.reduce((t, c) => t + c.ms, 0);
-  const escalados = new Map();
-  const escalado = async (i, lado) => {
-    const clave = `${i}:${lado}`;
-    if (!escalados.has(clave)) escalados.set(clave, await escalar(cuadros[i].bmp, lado, cuadrado));
-    return escalados.get(clave);
-  };
-  for (const minimo of minimos) {
-    for (const lado of [96, 80, 72, 64, 56, 48, 40, 32]) {
-      for (const [n, colores] of OPCIONES_GIF) {
-        const cantidad = Math.min(n, cuadros.length);
-        if (cantidad < Math.min(minimo, cuadros.length)) continue;
-        const elegidos = Array.from({ length: cantidad }, (_, i) => Math.floor((i * cuadros.length) / cantidad));
-        const bmps = await Promise.all(elegidos.map((i) => escalado(i, lado)));
-        const pixeles = await Promise.all(bmps.map(pixelesDe));
-        const retraso = Math.max(2, Math.round(totalMs / cantidad / 10));
-        const bytes = codificarGif(pixeles, bmps[0].width, bmps[0].height, colores, retraso);
-        if (bytes.length <= presupuesto) {
-          escalados.forEach((b) => b.close());
-          return { mime: "image/gif", bytes };
-        }
-      }
-    }
-  }
-  escalados.forEach((b) => b.close());
-  return null;
 }
 
 // Imagen recibida en un QR → Blob (si venía embebida) o { enlace } (si venía como enlace).
@@ -775,7 +582,7 @@ function precargarEnlace(campo) {
   if (motivo || !enlaceValido(valor)) {
     img.hidden = true;
     caja.classList.add("error");
-    texto.textContent = motivo || "Debe empezar por https:// y no tener espacios.";
+    texto.textContent = motivo || "El enlace tiene que empezar por https:// y no llevar espacios.";
     precargas.delete(campo);
     return Promise.resolve(false);
   }
@@ -785,15 +592,15 @@ function precargarEnlace(campo) {
   const promesa = new Promise((ok) => {
     img.onload = () => {
       img.hidden = false;
-      const google = valor !== original ? " · enlace ajustado" : "";
-      texto.textContent = `Lista · ${img.naturalWidth}×${img.naturalHeight}${google}`;
+      const google = valor !== original ? " (ajusté el enlace)" : "";
+      texto.textContent = `Lista, ${img.naturalWidth}×${img.naturalHeight} px${google}`;
       ok(true);
     };
     img.onerror = () => {
       caja.classList.add("error");
       texto.textContent = /^https:\/\/lh\d\.googleusercontent\.com\/d\//i.test(valor)
-        ? "No se pudo cargar. En Google Drive, el archivo debe estar compartido con «Cualquier persona con el enlace»."
-        : "No se pudo cargar la imagen. Revisa el enlace.";
+        ? "No carga. En Drive, comparte el archivo con «Cualquier persona con el enlace»."
+        : "No carga. Revisa que el enlace esté bien copiado.";
       ok(false);
     };
     img.src = valor;
@@ -889,12 +696,12 @@ async function descargarPng(boton) {
     }
     estado(
       bloqueadas
-        ? "Se descargaron el frente y el reverso. El sitio de la imagen enlazada (por ejemplo Google Fotos) no permite copiarla en un PNG, así que va el emblema en su lugar. El PDF sí la incluye; o sube el archivo para el PNG."
-        : "Se descargaron el frente y el reverso."
+        ? "Listo: frente y reverso descargados. La imagen enlazada no salió en el PNG porque su sitio (Google Fotos, por ejemplo) no lo permite; en su lugar va el emblema. Si la quieres, guarda el PDF o sube el archivo."
+        : "Listo: frente y reverso descargados."
     );
   } catch (e) {
     console.error("PNG:", e);
-    estado("No se pudo generar el PNG.", true);
+    estado("Algo falló al crear el PNG. Prueba de nuevo.", true);
   } finally {
     capa?.remove();
     boton.disabled = false;
@@ -956,12 +763,12 @@ async function modoVer(datos) {
   $("boton-unirse").onclick = () => modoClave({ modo: "unirse", d, logo: logoBlob });
   $("boton-renovar").onclick = () => modoClave({ modo: "renovar", d, logo: logoBlob, foto: fotoBlob });
   $("ver-aviso").textContent = esLider(d)
-    ? "Credencial del líder de la crew: no vence."
+    ? "Es la credencial del líder de la crew, así que no vence."
     : !d.a
-    ? "Esta credencial no tiene fecha de emisión."
+    ? "A esta credencial le falta la fecha de emisión."
     : venc
-      ? `Esta credencial venció el ${venceDe(d.a)}. No sirve para invitar hasta que su titular la renueve.`
-      : `Credencial reconstruida a partir de su QR. Válida hasta el ${venceDe(d.a)}.`;
+      ? `Venció el ${venceDe(d.a)}. Hasta que su dueño la renueve, no sirve para invitar.`
+      : `Vigente hasta el ${venceDe(d.a)}.`;
   mostrar("ver");
 }
 
@@ -991,10 +798,10 @@ function modoClave({ modo, d, logo, foto }) {
   $("clave-id").textContent = fundar ? "" : d.i;
   $("clave-id").hidden = fundar;
   $("clave-ayuda").textContent = fundar
-    ? "Elige el nombre, el color y la contraseña. La crew recibirá un ID único. Comparte la contraseña solo con quien quieras invitar: cada miembro podrá invitar a otros con su QR."
+    ? "Ponle nombre, color y contraseña. Se le asigna un ID propio, así que puede haber otra con el mismo nombre. Comparte la contraseña solo con quien quieras dentro: cualquier miembro puede invitar con el QR de su credencial."
     : modo === "renovar"
-      ? "Escribe la contraseña de la crew para emitir una credencial nueva, válida por un año."
-      : "Escribe la contraseña que te dio un miembro de la crew.";
+      ? "Con la contraseña de la crew sacas una credencial nueva, válida por un año."
+      : "Escribe la contraseña que te pasó alguien de la crew.";
   estado("", false, "clave-estado");
   mostrar("clave");
   (fundar ? form.crew : form.clave).focus();
@@ -1005,9 +812,9 @@ function modoClave({ modo, d, logo, foto }) {
     const boton = form.querySelector("button[type=submit]");
     if (fundar) {
       const crew = form.crew.value.trim();
-      if (!crew) return estado("Escribe el nombre de la crew.", true, "clave-estado");
-      if (form.clave.value.length < 10) return estado("Usa una contraseña de al menos 10 caracteres.", true, "clave-estado");
-      if (form.clave.value !== form.confirmar.value) return estado("Las contraseñas no coinciden.", true, "clave-estado");
+      if (!crew) return estado("Falta el nombre de la crew.", true, "clave-estado");
+      if (form.clave.value.length < 10) return estado("La contraseña necesita al menos 10 caracteres.", true, "clave-estado");
+      if (form.clave.value !== form.confirmar.value) return estado("Las dos contraseñas no son iguales.", true, "clave-estado");
       boton.disabled = true;
       estado("Preparando…", false, "clave-estado");
       const nueva = { c: crew, i: nuevoIdCrew(), k: form.color.value, s: form.estilo.value, ...(form.libre.checked ? { l: "1" } : {}) };
@@ -1021,7 +828,7 @@ function modoClave({ modo, d, logo, foto }) {
     // Pausa creciente tras cada fallo: frena intentos a mano desde la página.
     if (!ok) await new Promise((r) => setTimeout(r, Math.min(++intentos, 5) * 600));
     boton.disabled = false;
-    if (!ok) return estado("Contraseña incorrecta.", true, "clave-estado");
+    if (!ok) return estado("Esa no es la contraseña.", true, "clave-estado");
     modoCrear({
       crew: { c: d.c, i: d.i, k: d.k, s: d.s, ...(d.l ? { l: d.l } : {}), h: d.h },
       logoHeredado: logo,
@@ -1039,8 +846,8 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   $("crew-fija").textContent = crew.c;
   $("crew-id").textContent = crew.i;
   $("fechas").textContent = lider
-    ? `Emisión ${emision} · credencial de líder: no vence`
-    : `Emisión ${emision} · vence ${venceDe(emision)}`;
+    ? `Emitida el ${emision}. Como eres el líder, no vence.`
+    : `Emitida el ${emision}. Vence el ${venceDe(emision)}.`;
   if (lider && !form.r.value) form.r.value = "Líder";
   $("logo-heredado").hidden = !logoHeredado;
   for (const id of ["precarga-fotoEnlace", "precarga-logoEnlace"]) $(id).hidden = true;
@@ -1051,7 +858,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   const libre = crew.l === "1";
   $("estilo-miembro").hidden = !libre;
   $("estilo-fijo").hidden = libre;
-  $("estilo-fijo").textContent = `Estilo de la crew: ${ESTILOS[crew.s].nombre}`;
+  $("estilo-fijo").textContent = `Tu crew usa el estilo ${ESTILOS[crew.s].nombre}.`;
   pintarMuestras($("muestras-miembro"), "y", previo?.d.y && libre ? previo.d.y : crew.s);
   mostrar("crear");
 
@@ -1077,12 +884,8 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
       // Las imágenes con enlace no se embeben: no gastan presupuesto.
       const fotoEmbebida = enlace(form.fotoEnlace) ? null : fotoFuente;
       const logoEmbebido = enlace(form.logoEnlace) ? null : logoFuente;
-      const animado = [fotoEmbebida, logoEmbebido].some((f) => f?.type === "image/gif");
-      const logoAnimado = logoEmbebido?.type === "image/gif";
-      const logoNuevo = logoEmbebido
-        ? await miniatura(logoEmbebido, logoAnimado ? PRESUPUESTO_LOGO_ANIMADO : PRESUPUESTO_LOGO, { cuadrado: false })
-        : null;
-      const resto = (animado ? PRESUPUESTO_IMAGENES_ANIMADAS : PRESUPUESTO_IMAGENES) - (logoNuevo?.bytes.length ?? 0);
+      const logoNuevo = logoEmbebido ? await miniatura(logoEmbebido, PRESUPUESTO_LOGO, { cuadrado: false }) : null;
+      const resto = PRESUPUESTO_IMAGENES - (logoNuevo?.bytes.length ?? 0);
       const fotoNueva = fotoEmbebida ? await miniatura(fotoEmbebida, resto, { cuadrado: true }) : null;
       if (mia !== versionMini) return false;
       [miniLogo, miniFoto] = [logoNuevo, fotoNueva];
@@ -1090,7 +893,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
       estado("");
       return true;
     } catch {
-      if (mia === versionMini) estado("No se pudo leer una de las imágenes.", true);
+      if (mia === versionMini) estado("No pude abrir una de las imágenes. Prueba con otra.", true);
       return false;
     }
   }
@@ -1106,7 +909,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
       logoFuente = f ?? archivoInicial(logoHeredado);
       logoUrl = logoFuente && URL.createObjectURL(logoFuente);
     }
-    estado("Preparando imágenes para el QR…");
+    estado("Ajustando las imágenes para el QR…");
     if (await prepararMiniaturas()) pintar();
   };
   form.foto.onchange = cambiar(form.foto, "foto");
@@ -1146,7 +949,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
         /* sin tamaño */
       }
       partes.push(`<figure><img src="${URL.createObjectURL(blob)}" alt="">
-        <figcaption>${nombre} al escanear: ${tam}${img.mime === "image/gif" ? " · animado" : ""}</figcaption></figure>`);
+        <figcaption>${nombre} al escanear: ${tam}</figcaption></figure>`);
     }
     caja.hidden = !partes.length;
     caja.innerHTML = partes.join("");
@@ -1173,7 +976,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
     urlActual = base() + datos;
     nombreArchivo = `credencial-${slug(d.n)}`;
     const q = generarQr(base(), datos);
-    if (!q) estado("Los datos no caben en el QR. Prueba con imágenes más simples.", true);
+    if (!q) estado("No cabe todo en el QR. Prueba con una imagen más sencilla o usa un enlace.", true);
     // Vista: el archivo local si lo hay (mejor calidad); si no, el enlace.
     $("vista-crear").innerHTML = await credencial(d, { foto: fotoUrl || fotoEnlace, logo: logoUrl || logoEnlace, qr: q && qrImagen(q) });
     respaldoImagenes($("vista-crear"));

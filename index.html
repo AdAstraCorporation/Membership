@@ -25,8 +25,8 @@
       <h2 id="clave-titulo"></h2>
       <p id="clave-id" class="id-crew"></p>
       <p id="clave-ayuda" class="ayuda"></p>
-      <p id="nota-unirse" class="ayuda nota-unirse" hidden>¿Quieres unirte a una crew que ya existe? Escanea el QR de
-        la credencial de uno de sus miembros.</p>
+      <p id="nota-unirse" class="ayuda nota-unirse" hidden>¿Tu crew ya existe? Pídele a alguien de ella que te muestre
+        el QR de su credencial y escanéalo.</p>
       <div id="clave-fundar" class="grupo-campos" hidden>
         <label>Nombre de la crew <input name="crew" maxlength="30"></label>
         <label>Color
@@ -58,7 +58,7 @@
     <section class="panel-form">
       <p class="eyebrow">Directorio de tripulación</p>
       <h1>Tu credencial</h1>
-      <p class="sub">Nada se guarda: el QR contiene toda tu credencial, imágenes incluidas, y al escanearlo esta página la reconstruye.</p>
+      <p class="sub">El sitio no guarda nada. Tus datos van dentro del QR, y cuando alguien lo escanea ve tu credencial.</p>
 
       <form id="form" autocomplete="off">
         <p class="crew-fija">Crew: <strong id="crew-fija"></strong> <span id="crew-id" class="id-crew"></span><br><span id="fechas" class="ayuda"></span></p>
@@ -98,18 +98,18 @@
                 <small></small>
               </span></label>
           </div>
-          <small id="logo-heredado" class="ayuda" hidden>Ya tienes el logo de tu crew, tomado del QR con el que te uniste. Sube otro solo si quieres cambiarlo.</small>
-          <p class="aviso-calidad"><strong>Ojo:</strong> si subes un archivo, la imagen se guarda dentro del QR
-            muy reducida y <strong>pierde mucha calidad al escanearlo</strong> (tu PNG y tu PDF sí la usan
-            completa). Para que se vea bien al escanear, usa un enlace.</p>
+          <small id="logo-heredado" class="ayuda" hidden>Ya viene el logo de tu crew. Si quieres otro, súbelo aquí.</small>
+          <p class="aviso-calidad">Ojo: si subes la imagen como archivo, el QR guarda una copia diminuta y quien
+            lo escanee la verá borrosa. Tu PNG y tu PDF sí la llevan completa. Para que se vea bien al
+            escanear, pega un enlace.</p>
           <div id="calidad-qr" class="calidad-qr" hidden></div>
-          <small class="ayuda">Un archivo viaja dentro del QR en miniatura (se admiten GIF animados, que
-            hacen el QR más denso). Con un <strong>enlace</strong>, el QR guarda solo la dirección: más
-            liviano y la imagen se ve en su calidad original, pero depende de que el enlace siga activo y
-            el sitio que la aloja verá quién abre la credencial. Sirven enlaces directos a imágenes, Google Drive (archivo
-            compartido con «Cualquier persona con el enlace»), Google Fotos, Imgur, X, Reddit, Pinterest,
-            Bluesky, Tumblr y Fur Affinity. Instagram, Facebook, Discord y TikTok no: sus enlaces caducan. Tu PNG y tu PDF usan el archivo si lo
-            subiste.</small>
+          <small class="ayuda">Con un enlace, el QR guarda solo la dirección y la imagen se ve con su calidad
+            original, GIF animados incluidos. Si la subes como archivo, un GIF queda quieto. Ten en cuenta
+            que si borran la imagen desaparece de la credencial, y que el sitio donde está puede ver quién
+            la abre.</small>
+          <small class="ayuda">Sirven los enlaces directos a imágenes y los de Google Drive (con el archivo
+            compartido para «Cualquier persona con el enlace»), Google Fotos, Imgur, X, Reddit, Pinterest,
+            Bluesky, Tumblr y Fur Affinity. Los de Instagram, Facebook, Discord y TikTok no, porque caducan.</small>
         </fieldset>
       </form>
     </section>
@@ -117,7 +117,7 @@
     <section class="panel-vista">
       <div id="vista-crear"></div>
       <div class="acciones">
-        <button class="boton" data-accion="png" title="Descarga dos archivos: frente y reverso. Si el navegador pregunta, permite descargar varios archivos.">Descargar PNG (frente y reverso)</button>
+        <button class="boton" data-accion="png" title="Se bajan dos archivos, el frente y el reverso. Si el navegador pregunta, acepta las descargas múltiples.">Descargar PNG (frente y reverso)</button>
         <button class="boton secundario" data-accion="pdf">Guardar como PDF</button>
         <button class="boton secundario" data-accion="copiar">Copiar enlace</button>
       </div>
@@ -131,14 +131,14 @@
     <div class="acciones">
       <button id="boton-unirse" class="boton" hidden>Unirme a esta tripulación</button>
       <button id="boton-renovar" class="boton secundario" hidden>Renovar</button>
-      <button class="boton secundario" data-accion="png" title="Descarga dos archivos: frente y reverso. Si el navegador pregunta, permite descargar varios archivos.">Descargar PNG (frente y reverso)</button>
+      <button class="boton secundario" data-accion="png" title="Se bajan dos archivos, el frente y el reverso. Si el navegador pregunta, acepta las descargas múltiples.">Descargar PNG (frente y reverso)</button>
       <button class="boton secundario" data-accion="pdf">Guardar como PDF</button>
     </div>
     <p id="ver-aviso" class="aviso"></p>
   </main>
 
   <main id="error" class="ver" hidden>
-    <p class="vacio">Este enlace no contiene una credencial válida.</p>
+    <p class="vacio">Este enlace no trae una credencial válida.</p>
     <a class="boton" href="./">Fundar una crew</a>
   </main>
 
