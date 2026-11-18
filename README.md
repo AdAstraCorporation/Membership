@@ -12,6 +12,10 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
 - **Calidad.** Una imagen subida como archivo viaja en el QR muy reducida y pierde mucha
   calidad al escanear; la página lo avisa y muestra el tamaño real y cómo se verá. Con un
   enlace se conserva la calidad original.
+- **Sin evasiones.** En pantalla nunca se muestran el reverso con el QR ni los IDs de la crew y
+  del tripulante: se generan solo en el archivo descargado (PNG o PDF). Así, una captura de la
+  vista previa o de una credencial escaneada no sirve como credencial. Al abrir una credencial
+  escaneada, el enlace se borra de la barra de direcciones, y no hay botón para copiarlo.
 - **Todo va en el QR.** El QR del reverso contiene la credencial completa: datos, foto y
   logo de la crew (estos dos como miniaturas WebP fijas de unos 100–160 px). Al escanearlo, la página
   la reconstruye. El sitio no recibe nada: los datos van en el fragmento `#C…` del enlace,

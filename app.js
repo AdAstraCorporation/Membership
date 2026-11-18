@@ -481,8 +481,7 @@ function logoCrew(d, logoUrl) {
 }
 
 // ---------- Credencial (frente y reverso) ----------
-async function credencial(d, { foto, logo, qr }) {
-  const id = await idDe(d);
+async function credencial(d, { foto, logo }) {
   const color = esc(d.k);
   const vence = textoVence(d);
   const venc = vencida(d);
@@ -516,11 +515,11 @@ async function credencial(d, { foto, logo, qr }) {
         <dl>
           <dt>Crew</dt><dd>${esc(d.c)}</dd>
           <dt>Rol</dt><dd>${esc(d.r || "Tripulante")}</dd>
-          <dt>ID</dt><dd>${id}</dd>
+          <dt class="solo-descarga">ID</dt><dd class="solo-descarga" data-id-miembro></dd>
           <dt>Emisión</dt><dd>${esc(d.a || "")}</dd>
           <dt>Vence</dt><dd class="${venc ? "dato-vencido" : ""}">${esc(vence)}</dd>
         </dl>
-        <figure class="cred-crew">${logoCrew(d, logo)}<figcaption>${esc(d.i)}</figcaption></figure>
+        <figure class="cred-crew">${logoCrew(d, logo)}<figcaption class="solo-descarga" data-id-crew></figcaption></figure>
       </div>
       <footer class="cred-franja">Per aspera ad astra</footer>
     </article>
@@ -531,10 +530,10 @@ async function credencial(d, { foto, logo, qr }) {
         <p class="cred-org">Corporación Ad Astra</p>
         <p class="cred-sub">Registro de tripulación</p>
       </header>
-      <div class="rev-qr">${qr ? `<img src="${qr}" alt="QR de la credencial">` : `<p class="vacio">No se pudo generar el QR.</p>`}</div>
+      <div class="rev-qr" data-qr></div>
       <p class="rev-instr">Escanea para ver esta credencial<br>o unirte a la Crew ${esc(d.c)}</p>
-      <div class="rev-id"><span>${esc(d.n)}</span><span>${id}</span></div>
-      <div class="rev-id rev-id-crew"><span>Crew ${esc(d.i)}</span><span>${esLider(d) ? "Líder · permanente" : `Vence ${esc(vence)}`}</span></div>
+      <div class="rev-id"><span>${esc(d.n)}</span><span data-id-miembro></span></div>
+      <div class="rev-id rev-id-crew"><span>Crew <span data-id-crew></span></span><span>${esLider(d) ? "Líder · permanente" : `Vence ${esc(vence)}`}</span></div>
       <img class="rev-emblema" src="logo.png" alt="">
       <footer class="cred-franja">Per aspera ad astra</footer>
     </article>
@@ -615,7 +614,24 @@ function precargarImagenes(...fuentes) {
 }
 
 // ---------- Acciones ----------
-let urlActual = "";
+let credencialActual = null; // { d, datos }: lo necesario para el QR y los IDs, que solo van en las descargas
+
+// El reverso con el QR y los IDs de crew y tripulante no se muestran en pantalla: se generan
+// solo en el archivo descargado (PNG o PDF), para que una captura de la vista no sirva de credencial.
+async function completarParaDescarga(contenedor) {
+  if (!credencialActual) return;
+  const { d, datos } = credencialActual;
+  const id = await idDe(d);
+  contenedor.querySelectorAll("[data-id-miembro]").forEach((e) => (e.textContent = id));
+  contenedor.querySelectorAll("[data-id-crew]").forEach((e) => (e.textContent = d.i));
+  const q = generarQr(base(), datos);
+  contenedor.querySelectorAll("[data-qr]").forEach((e) => {
+    e.innerHTML = q ? `<img src="${qrImagen(q)}" alt="QR de la credencial">` : `<p class="vacio">No se pudo generar el QR.</p>`;
+  });
+}
+function limpiarDescarga(contenedor) {
+  contenedor.querySelectorAll("[data-id-miembro], [data-id-crew], [data-qr]").forEach((e) => (e.textContent = ""));
+}
 let nombreArchivo = "credencial";
 
 const slug = (s) =>
@@ -713,6 +729,7 @@ async function descargarPng(boton, modo = "separadas") {
     await Promise.all([...copia.querySelectorAll("img")].map((i) => (i.complete ? null : i.decode().catch(() => null))));
     // Imágenes enlazadas cuyo sitio no permite copiarlas (sin CORS, como Google Fotos): en el
     // PNG van con el emblema en su lugar, en vez de dejar un hueco. El PDF sí las incluye.
+    await completarParaDescarga(copia);
     estado("Preparando las imágenes…");
     const bloqueadas = await prepararImagenesExternas(copia);
     const [frente, reverso] = copia.querySelectorAll(".credencial");
@@ -745,18 +762,18 @@ document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-accion]");
   if (!b) return;
   const accion = b.dataset.accion;
-  if (accion === "pdf") window.print();
+  if (accion === "pdf") {
+    const caras = document.querySelector("main:not([hidden]) .caras");
+    if (caras) {
+      await completarParaDescarga(caras);
+      window.addEventListener("afterprint", () => limpiarDescarga(caras), { once: true });
+    }
+    window.print();
+  }
   if (accion === "png") preguntarFormatoPng(b);
   if (accion === "fundar" || accion === "volver-fundar") modoClave({ modo: "fundar" });
   if (accion === "unirse-qr") modoLeerQr();
-  if (accion === "copiar") {
-    try {
-      await navigator.clipboard.writeText(urlActual);
-      estado("Enlace copiado.");
-    } catch {
-      estado(urlActual);
-    }
-  }
+
 });
 
 function mostrar(id) {
@@ -780,17 +797,15 @@ async function modoVer(datos) {
   const logoBlob = fuenteDe(paquete.logo);
   precargarImagenes(fotoBlob, logoBlob);
   nombreArchivo = `credencial-${slug(d.n)}`;
-  urlActual = base() + datos;
+  credencialActual = { d, datos };
   document.title = `${d.n} · Corporación Ad Astra`;
-  const q = generarQr(base(), datos);
-  // Al escanear se muestra solo el frente; el reverso queda fuera de pantalla para las descargas.
+  history.replaceState(null, "", location.pathname + location.search); // el enlace no queda en la barra de direcciones
+  // En pantalla solo el frente, sin IDs; el reverso con el QR se arma solo al descargar.
   $("vista-ver").innerHTML = await credencial(d, {
     foto: srcDe(fotoBlob),
     logo: srcDe(logoBlob),
-    qr: q && qrImagen(q),
   });
   respaldoImagenes($("vista-ver"));
-  $("vista-ver").querySelector(".caras").classList.add("solo-frente");
 
   const venc = vencida(d);
   $("boton-unirse").hidden = !d.h || venc;
@@ -830,8 +845,7 @@ function modoClave({ modo, d, logo, foto }) {
   $("campo-confirmar").hidden = !fundar;
   $("clave-eyebrow").textContent = { fundar: "Fundar una crew", unirse: "Unirse a la tripulación", renovar: "Renovar credencial" }[modo];
   $("clave-titulo").textContent = fundar ? "Nueva crew" : `Crew ${d.c}`;
-  $("clave-id").textContent = fundar ? "" : d.i;
-  $("clave-id").hidden = fundar;
+  $("clave-id").hidden = true; // el ID de la crew solo aparece en los archivos descargados
   $("clave-ayuda").textContent = fundar
     ? "Ponle nombre, color y contraseña. Se le asigna un ID propio, así que puede haber otra con el mismo nombre. Comparte la contraseña solo con quien quieras dentro: cualquier miembro puede invitar con el QR de su credencial."
     : modo === "renovar"
@@ -879,7 +893,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   if (previo) for (const k of ["n", "e", "p", "r"]) form[k].value = previo.d[k] ?? "";
   const emision = hoy();
   $("crew-fija").textContent = crew.c;
-  $("crew-id").textContent = crew.i;
+  $("crew-id").textContent = ""; // el ID de la crew solo aparece en los archivos descargados
   $("fechas").textContent = lider
     ? `Emitida el ${emision}. Como eres el líder, no vence.`
     : `Emitida el ${emision}. Vence el ${venceDe(emision)}.`;
@@ -1008,12 +1022,11 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
       logo: logoEnlace ? imagenEnlace(logoEnlace) : miniLogo,
     });
     if (mio !== turno) return; // llegó una edición más reciente
-    urlActual = base() + datos;
+    credencialActual = { d, datos };
     nombreArchivo = `credencial-${slug(d.n)}`;
-    const q = generarQr(base(), datos);
-    if (!q) estado("No cabe todo en el QR. Prueba con una imagen más sencilla o usa un enlace.", true);
+    if (!generarQr(base(), datos)) estado("No cabe todo en el QR. Prueba con una imagen más sencilla o usa un enlace.", true);
     // Vista: el archivo local si lo hay (mejor calidad); si no, el enlace.
-    $("vista-crear").innerHTML = await credencial(d, { foto: fotoUrl || fotoEnlace, logo: logoUrl || logoEnlace, qr: q && qrImagen(q) });
+    $("vista-crear").innerHTML = await credencial(d, { foto: fotoUrl || fotoEnlace, logo: logoUrl || logoEnlace });
     respaldoImagenes($("vista-crear"));
   }
 
