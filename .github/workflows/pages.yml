@@ -1,0 +1,20 @@
+name: publicar
+
+# Pages está en modo "Deploy from a branch". Algunos pushes (por ejemplo, los
+# hechos por integraciones) no disparan la publicación; este paso la pide.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  pages: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Solicitar publicación en Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds"
