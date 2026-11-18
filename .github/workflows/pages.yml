@@ -1,20 +1,31 @@
 name: publicar
 
-# Pages está en modo "Deploy from a branch". Algunos pushes (por ejemplo, los
-# hechos por integraciones) no disparan la publicación; este paso la pide.
+# Publica la raíz del repo en GitHub Pages (fuente: GitHub Actions).
+# No hay paso de compilación: el sitio son archivos estáticos.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
+  contents: read
   pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   publicar:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
     steps:
-      - name: Solicitar publicación en Pages
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh api -X POST "repos/${{ github.repository }}/pages/builds"
+      - uses: actions/checkout@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: despliegue
+        uses: actions/deploy-pages@v4
