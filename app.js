@@ -666,6 +666,50 @@ function respaldoImagenes(contenedor) {
   logo?.addEventListener("error", () => logo.replaceWith(Object.assign(document.createElement("div"), { className: "crew-logo crew-logo-generado" })));
 }
 
+// Precarga la imagen de un campo de enlace y muestra su estado. Devuelve si cargó.
+const precargas = new WeakMap();
+function precargarEnlace(campo) {
+  const caja = $(`precarga-${campo.name}`);
+  const img = caja.querySelector("img");
+  const texto = caja.querySelector("small");
+  const valor = campo.value.trim();
+  caja.classList.remove("error");
+  if (!valor) {
+    caja.hidden = true;
+    return Promise.resolve(false);
+  }
+  caja.hidden = false;
+  if (!enlaceValido(valor)) {
+    img.hidden = true;
+    caja.classList.add("error");
+    texto.textContent = "Debe empezar por https:// y no tener espacios.";
+    return Promise.resolve(false);
+  }
+  if (precargas.get(campo)?.valor === valor) return precargas.get(campo).promesa;
+  img.hidden = true;
+  texto.textContent = "Cargando…";
+  const promesa = new Promise((ok) => {
+    img.onload = () => {
+      img.hidden = false;
+      texto.textContent = `Lista · ${img.naturalWidth}×${img.naturalHeight}`;
+      ok(true);
+    };
+    img.onerror = () => {
+      caja.classList.add("error");
+      texto.textContent = "No se pudo cargar la imagen. Revisa el enlace.";
+      ok(false);
+    };
+    img.src = valor;
+  });
+  precargas.set(campo, { valor, promesa });
+  return promesa;
+}
+
+// Empieza a descargar las imágenes enlazadas antes de armar la credencial.
+function precargarImagenes(...fuentes) {
+  for (const f of fuentes) if (f?.enlace) Object.assign(new Image(), { referrerPolicy: "no-referrer", src: f.enlace });
+}
+
 // ---------- Acciones ----------
 let urlActual = "";
 let nombreArchivo = "credencial";
@@ -749,6 +793,7 @@ async function modoVer(datos) {
   const { d } = paquete;
   const fotoBlob = fuenteDe(paquete.foto);
   const logoBlob = fuenteDe(paquete.logo);
+  precargarImagenes(fotoBlob, logoBlob);
   nombreArchivo = `credencial-${slug(d.n)}`;
   urlActual = base() + datos;
   document.title = `${d.n} · Corporación Ad Astra`;
@@ -851,6 +896,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
     : `Emisión ${emision} · vence ${venceDe(emision)}`;
   if (lider && !form.r.value) form.r.value = "Líder";
   $("logo-heredado").hidden = !logoHeredado;
+  for (const id of ["precarga-fotoEnlace", "precarga-logoEnlace"]) $(id).hidden = true;
   // Enlaces heredados (logo de la crew) o previos (renovación) se ponen en sus campos.
   if (logoHeredado?.enlace) form.logoEnlace.value = logoHeredado.enlace;
   if (previo?.foto?.enlace) form.fotoEnlace.value = previo.foto.enlace;
@@ -913,12 +959,23 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   };
   form.foto.onchange = cambiar(form.foto, "foto");
   form.logo.onchange = cambiar(form.logo, "logo");
-  // Al poner o quitar un enlace cambia qué se embebe: se recalculan las miniaturas.
+  // Al escribir o pegar un enlace, la imagen se precarga al momento: miniatura y estado junto al
+  // campo, y la credencial se actualiza sin esperar a salir del campo.
   for (const campo of [form.fotoEnlace, form.logoEnlace]) {
-    campo.onchange = async () => {
-      if (campo.value.trim() && !enlaceValido(campo.value)) return estado("El enlace debe empezar por https:// y no tener espacios.", true);
+    let espera;
+    const actualizar = async () => {
+      await precargarEnlace(campo);
       if (await prepararMiniaturas()) pintar();
     };
+    campo.oninput = () => {
+      clearTimeout(espera);
+      espera = setTimeout(actualizar, 250);
+    };
+    campo.onchange = () => {
+      clearTimeout(espera);
+      actualizar();
+    };
+    if (campo.value) precargarEnlace(campo); // enlace heredado o de la renovación
   }
 
   let turno = 0;
