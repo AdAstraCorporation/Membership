@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Sitio aislado: el navegador bloquea cualquier conexión fuera de este mismo sitio. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none'">
+  <!-- Sitio aislado: el navegador bloquea cualquier conexión fuera de este mismo sitio,
+       salvo imágenes https enlazadas por el propio usuario en su credencial. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none'">
   <title>Credencial · Corporación Ad Astra</title>
   <link rel="icon" href="favicon.png" type="image/png">
   <link rel="stylesheet" href="style.css">
@@ -91,12 +92,20 @@
 
         <fieldset>
           <legend>Imágenes <span class="opcional">(opcionales)</span></legend>
-          <label>Tu foto <input name="foto" type="file" accept="image/*"></label>
-          <label>Logo de la crew <input name="logo" type="file" accept="image/*"></label>
+          <div class="fila">
+            <label>Tu foto <input name="foto" type="file" accept="image/*"></label>
+            <label>o enlace <input name="fotoEnlace" type="url" maxlength="300" placeholder="https://…"></label>
+          </div>
+          <div class="fila">
+            <label>Logo de la crew <input name="logo" type="file" accept="image/*"></label>
+            <label>o enlace <input name="logoEnlace" type="url" maxlength="300" placeholder="https://…"></label>
+          </div>
           <small id="logo-heredado" class="ayuda" hidden>Ya tienes el logo de tu crew, tomado del QR con el que te uniste. Sube otro solo si quieres cambiarlo.</small>
-          <small class="ayuda">Viajan dentro del QR en miniatura, así que al escanearlo la credencial se
-            reconstruye completa. Se admiten GIF animados (el QR queda más denso). Tu PNG y tu PDF
-            usan las imágenes a tamaño completo.</small>
+          <small class="ayuda">Un archivo viaja dentro del QR en miniatura (se admiten GIF animados, que
+            hacen el QR más denso). Con un <strong>enlace</strong>, el QR guarda solo la dirección: más
+            liviano y la imagen se ve en su calidad original, pero depende de que el enlace siga activo y
+            el sitio que la aloja verá quién abre la credencial. Tu PNG y tu PDF usan el archivo si lo
+            subiste.</small>
         </fieldset>
       </form>
     </section>

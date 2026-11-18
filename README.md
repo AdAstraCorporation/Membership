@@ -21,14 +21,20 @@ página). No guarda nada y funciona aislado: no consume ningún servicio externo
 - **Vencimiento.** Las credenciales vencen al año de su emisión, salvo la del **líder** (quien
   fundó la crew), que es permanente. La marca de líder no se hereda al unirse. Una vencida muestra el
   sello *VENCIDA*, no sirve para invitar y se puede **renovar** con la contraseña.
+- **Imágenes por enlace.** En vez de subir la foto o el logo se puede poner un enlace `https`.
+  Entonces el QR guarda solo la dirección (unos pocos bytes en lugar de ~1,5 KB): mucho más
+  liviano y la imagen se ve en su calidad original, GIF incluidos. Depende de que el enlace siga
+  activo, y el sitio que la aloja verá quién abre la credencial. Si además se sube el archivo,
+  se usa solo para el PNG y el PDF. Quien se une hereda el enlace del logo de la crew.
 - **Aislado.** La Content-Security-Policy de `index.html` bloquea en el navegador cualquier
-  conexión fuera del sitio.
+  conexión fuera del sitio, salvo las imágenes `https` que el propio usuario enlaza.
 
 ## Detalles técnicos
 
 - Enlace: `<página>#C<base43>`. Base43 usa solo caracteres del modo alfanumérico del QR
   (`0-9 A-Z $ * + - . / :`), más compacto que el texto normal. El QR tiene dos segmentos:
   la dirección (modo byte) y los datos (alfanumérico), con corrección de errores M o L.
+- Imagen por enlace: bloque de formato 4 con la dirección en UTF-8 (solo `https`, ≤300).
 - Bytes (v3, binario): cabecera de 29 bytes (banderas, ID de crew en 30 bits, color RGB,
   emisión en días desde 2020, hash crudo de 16 bytes), textos separados por `␟` y comprimidos
   solo si ahorra, y por imagen `[tipo<<4|formato][largo][bytes]`.
@@ -52,6 +58,8 @@ página). No guarda nada y funciona aislado: no consume ningún servicio externo
 - Con foto y logo el QR es denso (versión ~35, cerca de 40 con GIF animados). Se lee bien desde la pantalla o impreso a
   buen tamaño; muy pequeño puede costar.
 - El vencimiento usa el reloj del dispositivo que escanea.
+- Una imagen enlazada solo sale en el PNG si su sitio permite CORS; si no, se ve en pantalla
+  pero falta en el PNG (subir el archivo lo resuelve).
 
 ## Archivos
 

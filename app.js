@@ -103,8 +103,13 @@ const descomprimir = (bytes) => transformar(bytes, new DecompressionStream("defl
 
 // ---------- Empaquetado binario ----------
 const VERSION = 3;
-const FORMATOS = { 1: "image/webp", 2: "image/jpeg", 3: "image/gif" };
-const CODIGO_FORMATO = { "image/webp": 1, "image/jpeg": 2, "image/gif": 3 };
+const FORMATOS = { 1: "image/webp", 2: "image/jpeg", 3: "image/gif", 4: "enlace" };
+const CODIGO_FORMATO = { "image/webp": 1, "image/jpeg": 2, "image/gif": 3, enlace: 4 };
+
+// Imagen por enlace: el QR guarda solo la dirección (https, sin espacios ni comillas).
+const ENLACE_RE = /^https:\/\/[^\s"'<>\\]{3,300}$/i;
+const enlaceValido = (u) => typeof u === "string" && ENLACE_RE.test(u.trim());
+const imagenEnlace = (u) => ({ mime: "enlace", enlace: u.trim(), bytes: new TextEncoder().encode(u.trim()) });
 const SEP = "\x1f"; // separador de los textos
 const EPOCA = Date.UTC(2020, 0, 1);
 const DIA = 864e5;
@@ -168,6 +173,7 @@ function firmaValida(mime, b) {
   if (mime === "image/webp") return b.length > 12 && texto4(b, 0) === "RIFF" && texto4(b, 8) === "WEBP";
   if (mime === "image/jpeg") return b[0] === 0xff && b[1] === 0xd8;
   if (mime === "image/gif") return b.length > 6 && texto4(b, 0) === "GIF8";
+  if (mime === "enlace") return enlaceValido(new TextDecoder().decode(b));
   return false;
 }
 
@@ -204,8 +210,9 @@ async function desempaquetar(texto) {
     const bytes = b.slice(o + 3, o + 3 + len);
     o += 3 + len;
     if (bytes.length !== len || !mime || !firmaValida(mime, bytes)) continue;
-    if (tipo === 1) imgs.foto = { mime, bytes };
-    if (tipo === 2) imgs.logo = { mime, bytes };
+    const img = mime === "enlace" ? imagenEnlace(new TextDecoder().decode(bytes)) : { mime, bytes };
+    if (tipo === 1) imgs.foto = img;
+    if (tipo === 2) imgs.logo = img;
   }
   return { d, ...imgs };
 }
@@ -514,7 +521,9 @@ async function gifMiniatura(cuadros, presupuesto, cuadrado) {
   return null;
 }
 
-const blobDe = (img) => (img ? new Blob([img.bytes], { type: img.mime }) : null);
+// Imagen recibida en un QR → Blob (si venía embebida) o { enlace } (si venía como enlace).
+const fuenteDe = (img) => (!img ? null : img.mime === "enlace" ? { enlace: img.enlace } : new Blob([img.bytes], { type: img.mime }));
+const srcDe = (fuente) => (!fuente ? null : fuente.enlace ?? URL.createObjectURL(fuente));
 
 // ---------- Contraseña de la crew ----------
 // PBKDF2-SHA256, 210 000 iteraciones, 16 bytes en base64url.
@@ -581,7 +590,7 @@ function qrImagen(q) {
 
 // ---------- Logo de la crew ----------
 function logoCrew(d, logoUrl) {
-  if (logoUrl) return `<img class="crew-logo" src="${esc(logoUrl)}" alt="${esc(d.c)}">`;
+  if (logoUrl) return `<img class="crew-logo" src="${esc(logoUrl)}" alt="${esc(d.c)}" referrerpolicy="no-referrer">`;
   const iniciales = d.c.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => [...p][0]).join("").toUpperCase();
   return `<div class="crew-logo crew-logo-generado" aria-label="${esc(d.c)}"><span>${esc(iniciales)}</span></div>`;
 }
@@ -610,7 +619,7 @@ async function credencial(d, { foto, logo, qr }) {
       </div>
       <div class="cred-foto">
         ${foto
-          ? `<img src="${esc(foto)}" alt="${esc(d.n)}">`
+          ? `<img src="${esc(foto)}" alt="${esc(d.n)}" referrerpolicy="no-referrer">`
           : `<div class="cred-sinfoto"><img src="logo.png" alt=""><span>Sin imagen</span></div>`}
         ${sello}
       </div>
@@ -647,6 +656,16 @@ async function credencial(d, { foto, logo, qr }) {
   </div>`;
 }
 
+// Si una imagen (p. ej. un enlace caído) no carga, se muestra el marcador.
+function respaldoImagenes(contenedor) {
+  const foto = contenedor.querySelector(".cred-foto > img");
+  foto?.addEventListener("error", () => {
+    foto.outerHTML = `<div class="cred-sinfoto"><img src="logo.png" alt=""><span>Imagen no disponible</span></div>`;
+  });
+  const logo = contenedor.querySelector("img.crew-logo");
+  logo?.addEventListener("error", () => logo.replaceWith(Object.assign(document.createElement("div"), { className: "crew-logo crew-logo-generado" })));
+}
+
 // ---------- Acciones ----------
 let urlActual = "";
 let nombreArchivo = "credencial";
@@ -681,7 +700,9 @@ async function descargarPng(boton) {
     await cargarHtml2canvas();
     const caras = document.querySelector("main:not([hidden]) .caras"); // la credencial de la pantalla visible
     if (!caras) return;
-    const canvas = await window.html2canvas(caras, { scale: 3, backgroundColor: null });
+    const externas = [...caras.querySelectorAll("img")].some((i) => /^https:/i.test(i.getAttribute("src") ?? ""));
+    const canvas = await window.html2canvas(caras, { scale: 3, backgroundColor: null, useCORS: true });
+    if (externas) estado("Si alguna imagen enlazada no aparece en el PNG, su sitio no permite copiarla (CORS). Sube el archivo para el PNG.");
     const a = document.createElement("a");
     a.download = `${nombreArchivo}.png`;
     a.href = canvas.toDataURL("image/png");
@@ -726,17 +747,18 @@ async function modoVer(datos) {
     return mostrar("error");
   }
   const { d } = paquete;
-  const fotoBlob = blobDe(paquete.foto);
-  const logoBlob = blobDe(paquete.logo);
+  const fotoBlob = fuenteDe(paquete.foto);
+  const logoBlob = fuenteDe(paquete.logo);
   nombreArchivo = `credencial-${slug(d.n)}`;
   urlActual = base() + datos;
   document.title = `${d.n} · Corporación Ad Astra`;
   const q = generarQr(base(), datos);
   $("vista-ver").innerHTML = await credencial(d, {
-    foto: fotoBlob && URL.createObjectURL(fotoBlob),
-    logo: logoBlob && URL.createObjectURL(logoBlob),
+    foto: srcDe(fotoBlob),
+    logo: srcDe(logoBlob),
     qr: q && qrImagen(q),
   });
+  respaldoImagenes($("vista-ver"));
 
   const venc = vencida(d);
   $("boton-unirse").hidden = !d.h || venc;
@@ -829,6 +851,9 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
     : `Emisión ${emision} · vence ${venceDe(emision)}`;
   if (lider && !form.r.value) form.r.value = "Líder";
   $("logo-heredado").hidden = !logoHeredado;
+  // Enlaces heredados (logo de la crew) o previos (renovación) se ponen en sus campos.
+  if (logoHeredado?.enlace) form.logoEnlace.value = logoHeredado.enlace;
+  if (previo?.foto?.enlace) form.fotoEnlace.value = previo.foto.enlace;
   const libre = crew.l === "1";
   $("estilo-miembro").hidden = !libre;
   $("estilo-fijo").hidden = libre;
@@ -837,10 +862,13 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   mostrar("crear");
 
   // Fuentes de imagen (archivo local o miniatura heredada) y sus miniaturas para el QR.
-  let fotoFuente = previo?.foto ?? null;
-  let logoFuente = logoHeredado ?? null;
+  // Si hay enlace, el QR lleva el enlace; el archivo (si lo hay) solo se usa en el PNG y el PDF.
+  const archivoInicial = (x) => (x instanceof Blob ? x : null);
+  let fotoFuente = archivoInicial(previo?.foto);
+  let logoFuente = archivoInicial(logoHeredado);
   let fotoUrl = fotoFuente && URL.createObjectURL(fotoFuente);
   let logoUrl = logoFuente && URL.createObjectURL(logoFuente);
+  const enlace = (campo) => (enlaceValido(campo.value) ? campo.value.trim() : "");
   let miniFoto = null;
   let miniLogo = null;
 
@@ -849,13 +877,16 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   async function prepararMiniaturas() {
     const mia = ++versionMini;
     try {
-      const animado = [fotoFuente, logoFuente].some((f) => f?.type === "image/gif");
-      const logoAnimado = logoFuente?.type === "image/gif";
-      const logoNuevo = logoFuente
-        ? await miniatura(logoFuente, logoAnimado ? PRESUPUESTO_LOGO_ANIMADO : PRESUPUESTO_LOGO, { cuadrado: false })
+      // Las imágenes con enlace no se embeben: no gastan presupuesto.
+      const fotoEmbebida = enlace(form.fotoEnlace) ? null : fotoFuente;
+      const logoEmbebido = enlace(form.logoEnlace) ? null : logoFuente;
+      const animado = [fotoEmbebida, logoEmbebido].some((f) => f?.type === "image/gif");
+      const logoAnimado = logoEmbebido?.type === "image/gif";
+      const logoNuevo = logoEmbebido
+        ? await miniatura(logoEmbebido, logoAnimado ? PRESUPUESTO_LOGO_ANIMADO : PRESUPUESTO_LOGO, { cuadrado: false })
         : null;
       const resto = (animado ? PRESUPUESTO_IMAGENES_ANIMADAS : PRESUPUESTO_IMAGENES) - (logoNuevo?.bytes.length ?? 0);
-      const fotoNueva = fotoFuente ? await miniatura(fotoFuente, resto, { cuadrado: true }) : null;
+      const fotoNueva = fotoEmbebida ? await miniatura(fotoEmbebida, resto, { cuadrado: true }) : null;
       if (mia !== versionMini) return false;
       [miniLogo, miniFoto] = [logoNuevo, fotoNueva];
       estado("");
@@ -874,7 +905,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
       fotoUrl = f && URL.createObjectURL(f);
     } else {
       if (logoUrl) URL.revokeObjectURL(logoUrl);
-      logoFuente = f ?? logoHeredado ?? null;
+      logoFuente = f ?? archivoInicial(logoHeredado);
       logoUrl = logoFuente && URL.createObjectURL(logoFuente);
     }
     estado("Preparando imágenes para el QR…");
@@ -882,6 +913,13 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   };
   form.foto.onchange = cambiar(form.foto, "foto");
   form.logo.onchange = cambiar(form.logo, "logo");
+  // Al poner o quitar un enlace cambia qué se embebe: se recalculan las miniaturas.
+  for (const campo of [form.fotoEnlace, form.logoEnlace]) {
+    campo.onchange = async () => {
+      if (campo.value.trim() && !enlaceValido(campo.value)) return estado("El enlace debe empezar por https:// y no tener espacios.", true);
+      if (await prepararMiniaturas()) pintar();
+    };
+  }
 
   let turno = 0;
   async function pintar() {
@@ -895,13 +933,19 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
     } catch {
       d = limpiar({ ...crudo, n: "Tu nombre" });
     }
-    const datos = await empaquetar(d, { foto: miniFoto, logo: miniLogo });
+    const [fotoEnlace, logoEnlace] = [enlace(form.fotoEnlace), enlace(form.logoEnlace)];
+    const datos = await empaquetar(d, {
+      foto: fotoEnlace ? imagenEnlace(fotoEnlace) : miniFoto,
+      logo: logoEnlace ? imagenEnlace(logoEnlace) : miniLogo,
+    });
     if (mio !== turno) return; // llegó una edición más reciente
     urlActual = base() + datos;
     nombreArchivo = `credencial-${slug(d.n)}`;
     const q = generarQr(base(), datos);
     if (!q) estado("Los datos no caben en el QR. Prueba con imágenes más simples.", true);
-    $("vista-crear").innerHTML = await credencial(d, { foto: fotoUrl, logo: logoUrl, qr: q && qrImagen(q) });
+    // Vista: el archivo local si lo hay (mejor calidad); si no, el enlace.
+    $("vista-crear").innerHTML = await credencial(d, { foto: fotoUrl || fotoEnlace, logo: logoUrl || logoEnlace, qr: q && qrImagen(q) });
+    respaldoImagenes($("vista-crear"));
   }
 
   let espera;
