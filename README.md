@@ -72,7 +72,7 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
   través de [wsrv.nl](https://wsrv.nl), un servicio público y gratuito de imágenes que sí lo
   permite (wsrv.nl ve la dirección de la imagen). En pantalla, al escanear y en el PDF se usa el
   enlace original. Si wsrv.nl no la obtiene, el PNG lleva el emblema y se avisa.
-- Bytes (v3, binario): cabecera de 29 bytes (banderas, ID de crew en 30 bits, color RGB,
+- Bytes (v4, binario): cabecera de 31 bytes (banderas, ID de crew en 30 bits, color RGB,
   emisión e ingreso en días desde 2020 (formato v4; las v3 se siguen leyendo), hash crudo de 16 bytes), textos separados por `␟` y comprimidos
   solo si ahorra, y por imagen `[tipo<<4|formato][largo][bytes]`.
 - Imágenes: presupuesto de ~1,4 KB entre las dos. Reescalado
