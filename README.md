@@ -35,7 +35,12 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
 - Enlace: `<página>#C<base43>`. Base43 usa solo caracteres del modo alfanumérico del QR
   (`0-9 A-Z $ * + - . / :`), más compacto que el texto normal. El QR tiene dos segmentos:
   la dirección (modo byte) y los datos (alfanumérico), con corrección de errores M o L.
-- Imagen por enlace: bloque de formato 4 con la dirección en UTF-8 (solo `https`, ≤300).
+- Imagen por enlace: bloque de formato 4 con la dirección en UTF-8 (solo `https`, ≤500).
+- Enlaces de Google: un archivo compartido de **Google Drive** se convierte solo a imagen
+  directa (`lh3.googleusercontent.com/d/<id>`), y una imagen directa de **Google Fotos**
+  (`lh3.googleusercontent.com/…`) se ajusta a 512 px (`=s512`). El enlace de *compartir* de
+  Google Fotos (`photos.app.goo.gl/…`) es una página, no una imagen, y convertirlo exigiría un
+  servidor: la página lo detecta y guía para copiar la dirección de la imagen.
 - Bytes (v3, binario): cabecera de 29 bytes (banderas, ID de crew en 30 bits, color RGB,
   emisión en días desde 2020, hash crudo de 16 bytes), textos separados por `␟` y comprimidos
   solo si ahorra, y por imagen `[tipo<<4|formato][largo][bytes]`.

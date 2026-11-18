@@ -107,8 +107,38 @@ const FORMATOS = { 1: "image/webp", 2: "image/jpeg", 3: "image/gif", 4: "enlace"
 const CODIGO_FORMATO = { "image/webp": 1, "image/jpeg": 2, "image/gif": 3, enlace: 4 };
 
 // Imagen por enlace: el QR guarda solo la dirección (https, sin espacios ni comillas).
-const ENLACE_RE = /^https:\/\/[^\s"'<>\\]{3,300}$/i;
+const ENLACE_RE = /^https:\/\/[^\s"'<>\\]{3,500}$/i;
 const enlaceValido = (u) => typeof u === "string" && ENLACE_RE.test(u.trim());
+
+// Enlaces de Google que se pueden convertir sin servidor:
+// - Google Drive (archivo compartido) → imagen directa lh3.googleusercontent.com/d/<id>
+// - Imagen directa de Google Fotos (lh3.googleusercontent.com/…=w…-h…) → tamaño 512 px
+//   (carga más rápido y el enlace queda más corto en el QR)
+// Los enlaces de compartir de Google Fotos son páginas, no imágenes: se detectan para guiar.
+const TAM_GOOGLE = "=s512";
+function normalizarEnlace(valor) {
+  const v = (valor ?? "").trim();
+  let u;
+  try {
+    u = new URL(v);
+  } catch {
+    return v;
+  }
+  if (u.hostname === "drive.google.com") {
+    const id = u.pathname.match(/\/file\/d\/([\w-]+)/)?.[1] ?? u.searchParams.get("id");
+    if (id) {
+      const clave = u.searchParams.get("resourcekey");
+      return `https://lh3.googleusercontent.com/d/${id}${clave ? `?resourcekey=${clave}` : ""}`;
+    }
+  }
+  if (/^lh\d\.googleusercontent\.com$/.test(u.hostname) && !u.pathname.startsWith("/d/") && !u.search) {
+    // El tamaño va al final tras "=" (p. ej. =w2400-h1600-no); se reemplaza por uno fijo.
+    const base = u.pathname.replace(/=[\w-]*$/, "");
+    return `https://${u.hostname}${base}${TAM_GOOGLE}`;
+  }
+  return v;
+}
+const esPaginaGoogleFotos = (valor) => /^https:\/\/(photos\.app\.goo\.gl|goo\.gl\/photos|photos\.google\.com)\//i.test((valor ?? "").trim());
 const imagenEnlace = (u) => ({ mime: "enlace", enlace: u.trim(), bytes: new TextEncoder().encode(u.trim()) });
 const SEP = "\x1f"; // separador de los textos
 const EPOCA = Date.UTC(2020, 0, 1);
@@ -672,13 +702,25 @@ function precargarEnlace(campo) {
   const caja = $(`precarga-${campo.name}`);
   const img = caja.querySelector("img");
   const texto = caja.querySelector("small");
-  const valor = campo.value.trim();
+  const original = campo.value.trim();
+  const valor = normalizarEnlace(original);
+  const ayuda = caja.parentElement.querySelector(".ayuda-google"); // va junto a la caja, en el mismo campo
+  ayuda.hidden = true;
   caja.classList.remove("error");
   if (!valor) {
     caja.hidden = true;
     return Promise.resolve(false);
   }
   caja.hidden = false;
+  if (esPaginaGoogleFotos(valor)) {
+    img.hidden = true;
+    caja.classList.add("error");
+    texto.textContent = "Ese enlace abre la página de Google Fotos, no la imagen.";
+    ayuda.querySelector("a").href = valor;
+    ayuda.hidden = false;
+    precargas.delete(campo);
+    return Promise.resolve(false);
+  }
   if (!enlaceValido(valor)) {
     img.hidden = true;
     caja.classList.add("error");
@@ -691,7 +733,8 @@ function precargarEnlace(campo) {
   const promesa = new Promise((ok) => {
     img.onload = () => {
       img.hidden = false;
-      texto.textContent = `Lista · ${img.naturalWidth}×${img.naturalHeight}`;
+      const google = valor !== original ? " · enlace de Google ajustado" : "";
+      texto.textContent = `Lista · ${img.naturalWidth}×${img.naturalHeight}${google}`;
       ok(true);
     };
     img.onerror = () => {
@@ -938,7 +981,10 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   let logoFuente = archivoInicial(logoHeredado);
   let fotoUrl = fotoFuente && URL.createObjectURL(fotoFuente);
   let logoUrl = logoFuente && URL.createObjectURL(logoFuente);
-  const enlace = (campo) => (enlaceValido(campo.value) ? campo.value.trim() : "");
+  const enlace = (campo) => {
+    const v = normalizarEnlace(campo.value);
+    return enlaceValido(v) && !esPaginaGoogleFotos(v) ? v : "";
+  };
   let miniFoto = null;
   let miniLogo = null;
 

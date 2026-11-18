@@ -221,4 +221,8 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 .precarga img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid var(--borde); background: var(--panel); }
 .precarga small { color: var(--tenue); font-weight: 400; font-size: .8rem; }
 .precarga.error small { color: #d08a80; }
+.ayuda-google { display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; margin-top: .2rem; }
+.ayuda-google .boton { padding: .45rem .8rem; font-size: .85rem; }
+.ayuda-google small { color: var(--tenue); font-weight: 400; font-size: .8rem; line-height: 1.5; }
+.ayuda-google code { font-size: .75rem; color: var(--texto); }
 .grupo-campos { display: flex; flex-direction: column; gap: 1rem; }
