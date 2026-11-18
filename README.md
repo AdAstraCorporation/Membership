@@ -2,80 +2,61 @@
 
 Sitio estático en GitHub Pages: https://adastracorporation.github.io/Membership/
 
-Cada miembro llena sus datos y descarga su credencial en **PNG** o **PDF** (A6).
-No hay base de datos ni servidor: los datos viajan comprimidos en el enlace
-(`#d=...`), y ese enlace es lo que lleva el **QR**. Al escanearlo, la página
-reconstruye la misma credencial.
+Toma datos y genera la credencial en **PNG** (frente y reverso) o **PDF** (A6, una cara por
+página). No guarda nada y funciona aislado: no consume ningún servicio externo.
 
 ## Cómo funciona
 
-- **Aislado:** no consume ningún servicio externo. La Content-Security-Policy de
-  `index.html` hace que el navegador bloquee cualquier conexión fuera del sitio.
-- **Sin almacenamiento:** los datos viajan comprimidos (deflate + base64url) en el
-  fragmento `#d=` del enlace, que es lo que lleva el QR. El fragmento no llega al
-  servidor.
-- **Foto:** se usa solo en el navegador para el PNG y el PDF. No cabe en el QR; al
-  escanearlo, la credencial muestra el emblema de la corporación.
-- **Frente:** foto, nombre, crew, rol, ID, alta y, abajo a la derecha, el logo de la crew.
-- **Reverso:** el QR con el emblema de la corporación al centro (corrección de errores H).
-- **ID** `AA-XXXX`: se calcula a partir de los datos, siempre igual para la misma credencial.
+- **Todo va en el QR.** El QR del reverso contiene la credencial completa: datos, foto y
+  logo de la crew (estos dos como miniaturas WebP de unos 100 px). Al escanearlo, la página
+  la reconstruye. El sitio no recibe nada: los datos van en el fragmento `#C…` del enlace,
+  que el navegador no envía al servidor.
+- **Crews.** Cualquiera puede fundar una: nombre, color, estilo y contraseña. Recibe un
+  **ID único** (`CR-XXXXXX`), así que dos crews con el mismo nombre son distintas.
+- **Unirse.** Se escanea el QR de un miembro, se pulsa *Unirme a esta tripulación* y se
+  escribe la contraseña de la crew. La credencial nueva hereda la crew (incluido su logo) y su
+  QR también puede invitar.
+- **Estilos.** Clásica, Nocturna, Minimal y Ceremonial. Los elige el fundador, que además
+  decide si cada miembro puede escoger el suyo. Quien se une recibe el estilo de la crew.
+- **Vencimiento.** Las credenciales vencen al año de su emisión. Una vencida muestra el
+  sello *VENCIDA*, no sirve para invitar y se puede **renovar** con la contraseña.
+- **Aislado.** La Content-Security-Policy de `index.html` bloquea en el navegador cualquier
+  conexión fuera del sitio.
 
-## Unirse a una tripulación
+## Detalles técnicos
 
-1. Se escanea el QR de un miembro de la crew y se pulsa **Unirme a esta tripulación**.
-2. Se escribe la **contraseña de la crew**. El QR lleva su hash (campo `h`) y debe
-   coincidir con el hash oficial de `config.json` (`crews.<id>.clave`).
-3. La credencial nueva lleva el mismo hash, así que su QR también puede invitar.
+- Enlace: `<página>#C<base43>`. Base43 usa solo caracteres del modo alfanumérico del QR
+  (`0-9 A-Z $ * + - . / :`), más compacto que el texto normal. El QR tiene dos segmentos:
+  la dirección (modo byte) y los datos (alfanumérico), con corrección de errores M o L.
+- Bytes: `[2][largo JSON][JSON deflate-raw]` y por imagen `[tipo][formato][largo][bytes]`.
+- Imágenes: se ajustan a un presupuesto (~1,4 KB entre las dos), sin canal alfa y sin
+  metadatos (perfil de color, EXIF), que en miniaturas pesan más que la propia imagen.
+- Contraseña: PBKDF2-SHA256, 210 000 iteraciones. La sal incluye el ID de la crew, su estilo
+  y si los miembros pueden elegir estilo; alterar eso en un QR invalida la contraseña.
+- ID de miembro `AA-XXXX`: derivado de nombre, especie e ID de crew; no cambia al renovar.
 
-La primera credencial de cada crew se crea con **Soy fundador de una tripulación**
-(pide la misma contraseña).
+## Límites
 
-Hash: PBKDF2-SHA256, 210 000 iteraciones, sal `ad-astra:<crew>`, 16 bytes.
-
-### Logos de las crews
-
-Pon la imagen en `crews/` (PNG con fondo transparente, cuadrada) y añade su ruta en
-`config.json`, por ejemplo `"logo": "crews/C1.png"`. Sin logo, se dibuja un emblema con
-las iniciales y el color de la crew.
-
-### Cambiar la contraseña de una crew
-
-```
-node tools/clave.mjs C3 "frase larga y difícil de adivinar"
-```
-Pega el resultado en `config.json` → `crews.C3.clave` y haz push. Los QR anteriores
-de esa crew siguen mostrando la credencial, pero ya no sirven para invitar.
-
-### Límites (importante)
-
-Todo ocurre en el navegador y el hash es público (va en cada QR y en `config.json`):
-- Es un **control social, no de seguridad**: quien sepa usar las herramientas del
-  navegador puede saltárselo.
-- Una contraseña corta se puede adivinar por fuerza bruta. Usa frases largas.
+- Es un control social, no de seguridad: todo ocurre en el navegador y el hash de la
+  contraseña va en cada QR. Alguien con conocimientos técnicos puede saltárselo, y una
+  contraseña corta se puede adivinar por fuerza bruta. Usa frases largas.
+- Con foto y logo el QR es denso (versión ~35). Se lee bien desde la pantalla o impreso a
+  buen tamaño; muy pequeño puede costar.
+- El vencimiento usa el reloj del dispositivo que escanea.
 
 ## Archivos
 
 ```
-index.html   página (crear y ver)
-app.js       lógica: formulario, codificación del enlace, QR, PNG y PDF
-style.css    estilos
-config.json  crews (nombre, color, logo, hash de contraseña) y roles  ← EDITAR
-crews/       logos de las crews (p. ej. crews/C1.png); se enlazan en config.json → crews.<id>.logo
-tools/       clave.mjs: calcula el hash de la contraseña de una crew
-logo.png     emblema circular   logo-negro.png / logo-blanco.png  constelación (el negro va en el QR)
-favicon.png  icono de la pestaña
+index.html   página
+app.js       lógica: formularios, empaquetado, QR, estilos, PNG y PDF
+style.css    estilos de la página y de la credencial
+logo*.png    emblema y constelación   favicon.png  icono
 vendor/      html2canvas y qrcode-generator (MIT)
-.nojekyll    sirve los archivos tal cual en Pages
+.github/workflows/pages.yml   publica la raíz en Pages en cada push a main
 ```
-
-## Publicación
-
-El workflow `.github/workflows/pages.yml` publica la raíz del repo en cada push a
-`main` (fuente de Pages: GitHub Actions). No hay paso de compilación.
 
 ## Probar en local
 
 ```
 python3 -m http.server 8000
 ```
-y abre http://localhost:8000

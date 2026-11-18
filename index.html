@@ -15,32 +15,51 @@
     <nav><a href="./">Inicio</a></nav>
   </header>
 
-  <!-- Inicio: cómo unirse -->
+  <!-- Inicio -->
   <main id="inicio" class="inicio" hidden>
     <img class="inicio-logo" src="logo.png" alt="">
     <p class="eyebrow">Directorio de tripulación</p>
     <h1>Per aspera ad astra</h1>
-    <p class="sub">Para unirte a una tripulación, escanea el QR de la credencial de uno de sus miembros
-      y escribe la contraseña de la crew que te den.</p>
+    <p class="sub">Genera tu credencial de tripulante. El sitio no guarda nada: toda la credencial viaja
+      en su QR, y las credenciales vencen al año.</p>
     <ol class="pasos">
-      <li>Escanea el QR de un miembro de la tripulación.</li>
-      <li>Pulsa <strong>Unirme a esta tripulación</strong> y escribe la contraseña.</li>
+      <li>Escanea el QR de la credencial de un miembro de la tripulación.</li>
+      <li>Pulsa <strong>Unirme a esta tripulación</strong> y escribe la contraseña de la crew.</li>
       <li>Llena tus datos y descarga tu credencial. Tu QR también servirá para invitar.</li>
     </ol>
-    <button class="boton secundario" data-accion="fundar">Soy fundador de una tripulación</button>
+    <button class="boton secundario" data-accion="fundar">Fundar una crew</button>
   </main>
 
-  <!-- Unirse: contraseña de la crew -->
-  <main id="unirse" class="ver" hidden>
-    <form id="form-unirse" class="tarjeta-unirse" autocomplete="off">
-      <p class="eyebrow">Unirse a la tripulación</p>
-      <h2 id="unirse-titulo">Crew</h2>
-      <label id="unirse-crew" hidden>Crew <select name="c"></select></label>
-      <label>Contraseña de la crew
-        <input name="clave" type="password" required autocomplete="off">
-      </label>
+  <!-- Contraseña: fundar, unirse o renovar -->
+  <main id="clave" class="ver" hidden>
+    <form id="form-clave" class="tarjeta-unirse" autocomplete="off" novalidate>
+      <p id="clave-eyebrow" class="eyebrow"></p>
+      <h2 id="clave-titulo"></h2>
+      <p id="clave-id" class="id-crew"></p>
+      <p id="clave-ayuda" class="ayuda"></p>
+      <div id="clave-fundar" class="grupo-campos" hidden>
+        <label>Nombre de la crew <input name="crew" maxlength="30"></label>
+        <label>Color
+          <select name="color">
+            <option value="#b5a27c">Latón</option>
+            <option value="#7f98aa">Pizarra</option>
+            <option value="#a8826f">Terracota</option>
+            <option value="#8d88a3">Violeta</option>
+            <option value="#8a9a7b">Salvia</option>
+            <option value="#a36a6a">Granate</option>
+          </select>
+        </label>
+        <fieldset>
+          <legend>Estilo de credencial</legend>
+          <div id="muestras-crew" class="muestras"></div>
+          <label class="check"><input name="libre" type="checkbox">
+            <span>Cada miembro puede elegir su propio estilo</span></label>
+        </fieldset>
+      </div>
+      <label>Contraseña de la crew <input name="clave" type="password" autocomplete="off"></label>
+      <label id="campo-confirmar" hidden>Confirmar contraseña <input name="confirmar" type="password" autocomplete="off"></label>
       <button class="boton" type="submit">Continuar</button>
-      <p id="unirse-estado" class="estado" role="status"></p>
+      <p id="clave-estado" class="estado" role="status"></p>
     </form>
   </main>
 
@@ -49,28 +68,33 @@
     <section class="panel-form">
       <p class="eyebrow">Directorio de tripulación</p>
       <h1>Tu credencial</h1>
-      <p class="sub">El sitio funciona aislado y no guarda nada: el QR lleva tus datos y, al escanearlo,
-        esta página reconstruye la credencial.</p>
+      <p class="sub">Nada se guarda: el QR contiene toda tu credencial, imágenes incluidas, y al escanearlo esta página la reconstruye.</p>
 
       <form id="form" autocomplete="off">
-        <p class="crew-fija">Crew: <strong id="crew-fija"></strong></p>
+        <p class="crew-fija">Crew: <strong id="crew-fija"></strong> <span id="crew-id" class="id-crew"></span><br><span id="fechas" class="ayuda"></span></p>
         <label>Nombre de tu fursona <input name="n" required maxlength="40"></label>
         <div class="fila">
           <label>Especie <input name="e" required maxlength="40"></label>
           <label><span>Pronombres <span class="opcional">(opcional)</span></span> <input name="p" maxlength="20"></label>
         </div>
-        <div class="fila">
-          <label>Rol <select name="r" required></select></label>
-          <label>Fecha de alta <input name="a" type="date" required></label>
-        </div>
+        <label>Rol <input name="r" maxlength="30" list="roles" placeholder="Tripulante"></label>
+        <fieldset id="estilo-miembro" hidden>
+          <legend>Estilo de tu credencial</legend>
+          <div id="muestras-miembro" class="muestras"></div>
+        </fieldset>
+        <p id="estilo-fijo" class="ayuda" hidden></p>
+        <datalist id="roles">
+          <option value="Capitán"></option><option value="Piloto"></option><option value="Ingeniería"></option>
+          <option value="Exploración"></option><option value="Médico"></option><option value="Navegación"></option>
+        </datalist>
 
         <fieldset>
-          <legend>Imagen</legend>
-          <label>Desde tu equipo <span class="opcional">(opcional)</span>
-            <input name="foto" type="file" accept="image/*">
-            <small class="ayuda">Solo aparece en tu PNG y tu PDF. No cabe en el QR, así que al escanearlo
-              la credencial se muestra con el emblema de la corporación.</small>
-          </label>
+          <legend>Imágenes <span class="opcional">(opcionales)</span></legend>
+          <label>Tu foto <input name="foto" type="file" accept="image/*"></label>
+          <label>Logo de la crew <input name="logo" type="file" accept="image/*"></label>
+          <small id="logo-heredado" class="ayuda" hidden>Ya tienes el logo de tu crew, tomado del QR con el que te uniste. Sube otro solo si quieres cambiarlo.</small>
+          <small class="ayuda">Viajan dentro del QR en miniatura, así que al escanearlo la credencial se
+            reconstruye completa. Tu PNG y tu PDF usan las imágenes a tamaño completo.</small>
         </fieldset>
       </form>
     </section>
@@ -90,11 +114,12 @@
   <main id="ver" class="ver" hidden>
     <div id="vista-ver"></div>
     <div class="acciones">
-      <button id="boton-unirse" class="boton" data-accion="unirse" hidden>Unirme a esta tripulación</button>
+      <button id="boton-unirse" class="boton" hidden>Unirme a esta tripulación</button>
+      <button id="boton-renovar" class="boton secundario" hidden>Renovar</button>
       <button class="boton secundario" data-accion="png">Descargar PNG</button>
       <button class="boton secundario" data-accion="pdf">Guardar como PDF</button>
     </div>
-    <p id="ver-aviso" class="aviso">Credencial reconstruida a partir de su QR.</p>
+    <p id="ver-aviso" class="aviso"></p>
   </main>
 
   <main id="error" class="ver" hidden>

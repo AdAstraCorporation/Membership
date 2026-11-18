@@ -51,6 +51,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--acento); ou
 /* Credencial (gafete vertical) */
 .credencial {
   --papel: #ecebe6; --tinta: #1b1d22; --gris: #6b6f78; --oscuro: #1a1d23;
+  --cab-texto: #e2e3e6; --cab-tenue: #9a9ea8; --linea: #0002; --marco: var(--oscuro);
   position: relative; width: 360px; max-width: 100%; overflow: hidden;
   background: var(--papel); color: var(--tinta); border-radius: 18px;
   box-shadow: 0 18px 40px #0008, 0 0 0 1px #0004;
@@ -61,15 +62,15 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--acento); ou
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
   width: 64px; height: 10px; border-radius: 6px; background: var(--fondo); box-shadow: inset 0 1px 2px #000a; z-index: 2;
 }
-.cred-cab { background: var(--oscuro); color: #e2e3e6; display: flex; gap: .7rem; align-items: center; padding: 34px 20px 14px; }
+.cred-cab { background: var(--oscuro); color: var(--cab-texto); display: flex; gap: .7rem; align-items: center; padding: 34px 20px 14px; }
 .cred-logo { width: 46px; height: 46px; flex: none; }
 .cred-org { margin: 0; font-family: var(--serif); font-size: 1.15rem; letter-spacing: .04em; text-transform: uppercase; line-height: 1.1; }
-.cred-sub { margin: .15rem 0 0; font-size: .68rem; letter-spacing: .2em; text-transform: uppercase; color: #9a9ea8; }
+.cred-sub { margin: .15rem 0 0; font-size: .68rem; letter-spacing: .2em; text-transform: uppercase; color: var(--cab-tenue); }
 .cred-banda { background: var(--oscuro); border-top: 3px solid var(--crew); border-bottom: 3px solid var(--crew); text-align: center; padding: 8px 12px 10px; }
-.cred-titulo { margin: 0; font-size: .66rem; letter-spacing: .35em; text-transform: uppercase; color: #9a9ea8; }
+.cred-titulo { margin: 0; font-size: .66rem; letter-spacing: .35em; text-transform: uppercase; color: var(--cab-tenue); }
 .cred-rol { margin: .1rem 0 0; font-family: var(--serif); font-size: 1.55rem; letter-spacing: .12em; text-transform: uppercase; color: var(--crew); line-height: 1.15; }
 .cred-foto { padding: 16px 20px 0; }
-.cred-foto > img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; border: 2px solid var(--oscuro); }
+.cred-foto > img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; border: 2px solid var(--marco); }
 .cred-nombre { text-align: center; padding: 12px 16px 10px; border-bottom: 1px solid #0002; margin: 0 20px; }
 .cred-nombre h1 { font-family: var(--serif); font-weight: 600; font-size: 1.75rem; letter-spacing: .06em; text-transform: uppercase; margin: 0; line-height: 1.1; color: var(--tinta); }
 .cred-nombre p { margin: .25rem 0 0; font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--gris); }
@@ -77,7 +78,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--acento); ou
 .cred-datos dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; font-size: .78rem; }
 .cred-datos dt { font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: .66rem; color: var(--gris); padding-top: .1rem; }
 .cred-datos dd { margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.cred-franja { margin-top: auto; background: var(--oscuro); color: #9a9ea8; text-align: center; font-size: .6rem; letter-spacing: .22em; text-transform: uppercase; padding: 9px 8px; border-top: 3px solid var(--crew); }
+.cred-franja { margin-top: auto; background: var(--oscuro); color: var(--cab-tenue); text-align: center; font-size: .6rem; letter-spacing: .22em; text-transform: uppercase; padding: 9px 8px; border-top: 3px solid var(--crew); }
 .cred-sinfoto {
   aspect-ratio: 1; border-radius: 10px; border: 2px solid var(--oscuro); background: #23262d;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
@@ -145,15 +146,60 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 .cred-crew figcaption { font-size: .58rem; letter-spacing: .18em; text-transform: uppercase; color: var(--gris); max-width: 96px; text-align: center; line-height: 1.3; }
 
 /* Reverso */
-.rev-cab { background: var(--oscuro); color: #e2e3e6; text-align: center; padding: 36px 20px 16px; border-bottom: 3px solid var(--crew); }
-.rev-qr { padding: 26px 28px 8px; }
-.rev-qr img { display: block; width: 100%; aspect-ratio: 1; image-rendering: pixelated; border-radius: 12px; border: 1px solid #0002; background: #fff; }
+.rev-cab { background: var(--oscuro); color: var(--cab-texto); text-align: center; padding: 36px 20px 16px; border-bottom: 3px solid var(--crew); }
+.rev-qr { padding: 18px 16px 4px; }
+.rev-qr img { display: block; width: 100%; aspect-ratio: 1; image-rendering: pixelated; border-radius: 8px; border: 1px solid #0002; background: #fff; }
 .rev-instr { text-align: center; margin: 14px 24px 0; font-size: .7rem; line-height: 1.7; letter-spacing: .16em; text-transform: uppercase; color: var(--gris); }
 .rev-id { display: flex; justify-content: space-between; gap: 12px; margin: 18px 24px 18px; padding-top: 12px; border-top: 1px solid #0002;
   font-weight: 700; font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; }
 .rev-id span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.rev-emblema { display: block; width: 84px; height: 84px; margin: auto auto 22px; }
+
+.rev-id { margin-top: 14px; margin-bottom: 0; }
+.rev-id-crew { border-top: 0; padding-top: 4px; margin-bottom: 18px; color: var(--gris); font-size: .7rem; }
+.cred-foto { position: relative; }
+.sello-vencida {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-14deg);
+  border: 4px solid #a33b3b; color: #a33b3b; background: #ecebe6cc; border-radius: 8px;
+  padding: 6px 22px; font-family: var(--serif); font-size: 2.1rem; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+}
+.dato-vencido { color: #a33b3b; }
+.id-crew { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .8rem; letter-spacing: .08em; color: var(--tenue); margin: 0 0 .5rem; }
+.cred-crew figcaption { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .1em; }
+
+/* ---------- Estilos de credencial ---------- */
+/* 1 Clásica: los valores base. */
+
+/* 2 Nocturna: todo oscuro, acentos del color de la crew */
+.estilo-2 { --papel: #1c1f26; --tinta: #e4e6ea; --gris: #8e939d; --oscuro: #12141a; --linea: #ffffff1f; --marco: #2c313b; }
+.estilo-2 .cred-sinfoto { background: #252932; }
+.estilo-2 .rev-qr img { border-color: #ffffff22; }
+
+/* 3 Minimal: claro, sin bandas oscuras; solo líneas finas del color de la crew */
+.estilo-3 { --papel: #f4f3ef; --oscuro: #f4f3ef; --cab-texto: #1b1d22; --cab-tenue: #7a7e87; --marco: #d9d7d0; }
+.estilo-3 .cred-cab, .estilo-3 .rev-cab { border-bottom: 1px solid #0001; }
+.estilo-3 .cred-banda { border-top-width: 1px; border-bottom-width: 1px; }
+.estilo-3 .cred-franja { border-top-width: 1px; }
+.estilo-3 .crew-logo-generado { background: #f4f3ef; box-shadow: none; }
+.estilo-3 .cred-sinfoto { background: #e3e1da; }
+
+/* 4 Ceremonial: marfil, marco doble, tipografía con serifa */
+.estilo-4 { --papel: #f1ead9; --tinta: #2a2418; --gris: #7b6f58; --oscuro: #2a2418; --cab-texto: #f1ead9; --cab-tenue: #c9bb98; --marco: #2a2418; }
+.estilo-4 { border: 2px solid var(--crew); }
+.estilo-4 .cred-datos dd, .estilo-4 .rev-id { font-family: var(--serif); letter-spacing: .06em; }
+.estilo-4 .cred-rol { font-style: italic; }
+
+/* Muestras de estilo en los formularios */
+.muestras { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; }
+.muestra { display: flex; flex-direction: column; align-items: center; gap: .35rem; cursor: pointer; font-size: .78rem; font-weight: 400; color: var(--tenue); }
+.muestra input { position: absolute; opacity: 0; pointer-events: none; }
+.muestra i { width: 100%; aspect-ratio: .62; border-radius: 6px; border: 2px solid transparent; display: block;
+  background: linear-gradient(var(--a) 0 22%, var(--b) 22% 30%, var(--c) 30% 88%, var(--a) 88%); }
+.muestra input:checked + i { border-color: var(--acento); }
+.muestra input:focus-visible + i { outline: 2px solid var(--acento); outline-offset: 2px; }
+.muestra input:checked ~ span { color: var(--texto); }
+.check { flex-direction: row; align-items: flex-start; gap: .6rem; font-weight: 400; }
+.check input { width: auto; margin-top: .25rem; }
 
 /* PDF: una cara por página */
 @media print {
@@ -161,3 +207,5 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
   .caras .credencial { break-after: page; page-break-after: always; margin: 0 auto; }
   .caras .credencial:last-child { break-after: auto; page-break-after: auto; }
 }
+.rev-emblema { display: block; width: 64px; height: 64px; margin: auto auto 18px; opacity: .9; }
+.grupo-campos { display: flex; flex-direction: column; gap: 1rem; }
