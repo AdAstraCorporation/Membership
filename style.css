@@ -55,6 +55,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--acento); ou
   background: var(--papel); color: var(--tinta); border-radius: 18px;
   box-shadow: 0 18px 40px #0008, 0 0 0 1px #0004;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex; flex-direction: column;
 }
 .cred-ranura {
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
@@ -76,10 +77,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--acento); ou
 .cred-datos dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; font-size: .78rem; }
 .cred-datos dt { font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: .66rem; color: var(--gris); padding-top: .1rem; }
 .cred-datos dd { margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.cred-qr { margin: 0; text-align: center; flex: none; }
-.cred-qr img { display: block; width: 92px; height: 92px; image-rendering: pixelated; background: #fff; padding: 4px; border-radius: 4px; border: 1px solid #0003; }
-.cred-qr figcaption { font-size: .58rem; letter-spacing: .18em; text-transform: uppercase; color: var(--gris); margin-top: 4px; }
-.cred-franja { background: var(--oscuro); color: #9a9ea8; text-align: center; font-size: .6rem; letter-spacing: .22em; text-transform: uppercase; padding: 9px 8px; border-top: 3px solid var(--crew); }
+.cred-franja { margin-top: auto; background: var(--oscuro); color: #9a9ea8; text-align: center; font-size: .6rem; letter-spacing: .22em; text-transform: uppercase; padding: 9px 8px; border-top: 3px solid var(--crew); }
 .cred-sinfoto {
   aspect-ratio: 1; border-radius: 10px; border: 2px solid var(--oscuro); background: #23262d;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
@@ -88,7 +86,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--acento); ou
 .cred-sinfoto span { color: #8c919b; font-size: .72rem; letter-spacing: .25em; text-transform: uppercase; }
 
 /* Páginas */
-.crear { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 3rem; max-width: 1040px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; align-items: start; }
+.crear { display: grid; grid-template-columns: minmax(300px, 1fr) auto; gap: 3rem; max-width: 1320px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; align-items: start; }
 .panel-form .sub { margin: .2rem 0 1.8rem; line-height: 1.55; }
 .panel-vista { position: sticky; top: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 1.2rem; }
 .ver { display: flex; flex-direction: column; align-items: center; gap: 1.2rem; padding: 2.5rem 1rem 4rem; }
@@ -103,7 +101,7 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 .ayuda, .opcional { color: var(--tenue); font-weight: 400; font-size: .82rem; line-height: 1.45; }
 .estado { min-height: 1.5em; margin: 0; text-align: center; color: var(--tenue); word-break: break-all; }
 .estado.error { color: #d08a80; }
-@media (max-width: 860px) {
+@media (max-width: 1240px) {
   .crear { grid-template-columns: 1fr; }
   .panel-vista { position: static; }
 }
@@ -132,3 +130,34 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 .crew-fija { margin: 0; padding: .7rem .9rem; border: 1px solid var(--borde); border-radius: 8px; color: var(--tenue); }
 .crew-fija strong { color: var(--acento); font-weight: 600; }
 @media print { .inicio, #unirse { display: none !important; } }
+
+/* Dos caras */
+.caras { display: flex; flex-wrap: wrap; justify-content: center; align-items: stretch; gap: 24px; padding: 4px; }
+
+/* Logo de la crew (frente, abajo a la derecha) */
+.cred-crew { margin: 0; flex: none; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.crew-logo { width: 84px; height: 84px; object-fit: contain; display: block; }
+.crew-logo-generado {
+  border-radius: 50%; background: var(--oscuro); border: 3px solid var(--crew); box-shadow: inset 0 0 0 5px var(--oscuro), inset 0 0 0 6px var(--crew);
+  display: grid; place-items: center;
+}
+.crew-logo-generado span { font-family: var(--serif); font-size: 1.7rem; letter-spacing: .04em; color: var(--crew); }
+.cred-crew figcaption { font-size: .58rem; letter-spacing: .18em; text-transform: uppercase; color: var(--gris); max-width: 96px; text-align: center; line-height: 1.3; }
+
+/* Reverso */
+.rev-cab { background: var(--oscuro); color: #e2e3e6; text-align: center; padding: 36px 20px 16px; border-bottom: 3px solid var(--crew); }
+.rev-qr { padding: 26px 28px 8px; }
+.rev-qr img { display: block; width: 100%; aspect-ratio: 1; image-rendering: pixelated; border-radius: 12px; border: 1px solid #0002; background: #fff; }
+.rev-instr { text-align: center; margin: 14px 24px 0; font-size: .7rem; line-height: 1.7; letter-spacing: .16em; text-transform: uppercase; color: var(--gris); }
+.rev-id { display: flex; justify-content: space-between; gap: 12px; margin: 18px 24px 18px; padding-top: 12px; border-top: 1px solid #0002;
+  font-weight: 700; font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; }
+.rev-id span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rev-emblema { display: block; width: 84px; height: 84px; margin: auto auto 22px; }
+
+/* PDF: una cara por página */
+@media print {
+  .caras { display: block; padding: 0; }
+  .caras .credencial { break-after: page; page-break-after: always; margin: 0 auto; }
+  .caras .credencial:last-child { break-after: auto; page-break-after: auto; }
+}

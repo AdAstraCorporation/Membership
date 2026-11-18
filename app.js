@@ -86,22 +86,80 @@ async function idDe(d) {
   return "AA-" + [...hash.slice(0, 4)].map((b) => ABC[b % 32]).join("");
 }
 
-function qrDataUrl(texto) {
+// ---------- QR con el emblema al centro ----------
+const imagenes = {};
+const cargarImagen = (src) =>
+  (imagenes[src] ??= new Promise((ok, mal) => {
+    const img = new Image();
+    img.onload = () => ok(img);
+    img.onerror = mal;
+    img.src = src;
+  }));
+
+// Corrección de errores H (30 %): el centro se puede tapar con el logo y el QR sigue leyéndose.
+async function qrConLogo(texto) {
   if (!window.qrcode) return "";
-  const q = window.qrcode(0, "L");
+  const q = window.qrcode(0, "H");
   q.addData(texto);
   q.make();
-  return q.createDataURL(4, 0);
+  const n = q.getModuleCount();
+  const m = 12; // px por módulo
+  const margen = 3; // zona de silencio, en módulos
+  const lado = (n + margen * 2) * m;
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = lado;
+  const g = cv.getContext("2d");
+  g.fillStyle = "#ffffff";
+  g.fillRect(0, 0, lado, lado);
+
+  // Hueco central (~24 % del ancho) para el emblema
+  let caja = Math.round(n * 0.24);
+  if ((n - caja) % 2) caja++;
+  const ini = (n - caja) / 2;
+  const fin = ini + caja;
+
+  g.fillStyle = "#1a1d23";
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (r >= ini && r < fin && c >= ini && c < fin) continue;
+      if (q.isDark(r, c)) g.fillRect((c + margen) * m, (r + margen) * m, m, m);
+    }
+  }
+  try {
+    const logo = await cargarImagen("logo-negro.png");
+    const espacio = caja * m * 0.86;
+    const k = espacio / Math.max(logo.width, logo.height);
+    const w = logo.width * k;
+    const h = logo.height * k;
+    g.drawImage(logo, (lado - w) / 2, (lado - h) / 2, w, h);
+  } catch {
+    /* sin logo, el QR sigue siendo válido */
+  }
+  return cv.toDataURL("image/png");
 }
 
-// ---------- Credencial ----------
+// ---------- Logo de la crew ----------
+// config.json → crews.<id>.logo (ruta a una imagen del propio sitio, p. ej. "crews/C1.png").
+// Sin logo, se dibuja un emblema con las iniciales y el color de la crew.
+function logoCrew(id) {
+  const c = config.crews[id];
+  if (c?.logo && /^[\w./-]+$/.test(c.logo) && !c.logo.includes("..")) {
+    return `<img class="crew-logo" src="${esc(c.logo)}" alt="${esc(c.nombre)}">`;
+  }
+  const iniciales = (c?.nombre ?? id).split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+  return `<div class="crew-logo crew-logo-generado" aria-label="${esc(c?.nombre ?? id)}"><span>${esc(iniciales)}</span></div>`;
+}
+
+// ---------- Credencial (frente y reverso) ----------
 async function credencial(d, { foto, url }) {
   const crew = nombreCrew(d.c);
   const rol = nombreRol(d.r);
-  const imagen = foto; // solo la foto local; nada se carga de fuera
-  const qr = qrDataUrl(url);
+  const id = await idDe(d);
+  const qr = await qrConLogo(url);
+  const color = esc(colorCrew(d.c));
   return `
-    <article id="credencial" class="credencial" style="--crew:${esc(colorCrew(d.c))}">
+  <div id="credencial" class="caras">
+    <article class="credencial" style="--crew:${color}" aria-label="Frente">
       <div class="cred-ranura" aria-hidden="true"></div>
       <header class="cred-cab">
         <img class="cred-logo" src="logo.png" alt="">
@@ -115,8 +173,8 @@ async function credencial(d, { foto, url }) {
         <p class="cred-rol">${esc(rol)}</p>
       </div>
       <div class="cred-foto">
-        ${imagen
-          ? `<img src="${esc(imagen)}" alt="${esc(d.n)}">`
+        ${foto
+          ? `<img src="${esc(foto)}" alt="${esc(d.n)}">`
           : `<div class="cred-sinfoto"><img src="logo.png" alt=""><span>Sin imagen</span></div>`}
       </div>
       <div class="cred-nombre">
@@ -127,13 +185,32 @@ async function credencial(d, { foto, url }) {
         <dl>
           <dt>Crew</dt><dd>${esc(crew)}</dd>
           <dt>Rol</dt><dd>${esc(rol)}</dd>
-          <dt>ID</dt><dd>${await idDe(d)}</dd>
+          <dt>ID</dt><dd>${id}</dd>
           <dt>Alta</dt><dd>${esc(d.a || "")}</dd>
         </dl>
-        ${qr ? `<figure class="cred-qr"><img src="${qr}" alt="QR de la credencial"><figcaption>Escanéame</figcaption></figure>` : ""}
+        <figure class="cred-crew">${logoCrew(d.c)}<figcaption>${esc(crew)}</figcaption></figure>
       </div>
       <footer class="cred-franja">Per aspera ad astra</footer>
-    </article>`;
+    </article>
+
+    <article class="credencial cred-reverso" style="--crew:${color}" aria-label="Reverso">
+      <div class="cred-ranura" aria-hidden="true"></div>
+      <header class="rev-cab">
+        <p class="cred-org">Corporación Ad Astra</p>
+        <p class="cred-sub">Registro de tripulación</p>
+      </header>
+      <div class="rev-qr">
+        ${qr ? `<img src="${qr}" alt="QR de la credencial">` : ""}
+      </div>
+      <p class="rev-instr">Escanea para ver esta credencial<br>o unirte a la Crew ${esc(crew)}</p>
+      <div class="rev-id">
+        <span>${esc(d.n)}</span>
+        <span>${id}</span>
+      </div>
+      <img class="rev-emblema" src="logo.png" alt="">
+      <footer class="cred-franja">Per aspera ad astra</footer>
+    </article>
+  </div>`;
 }
 
 // Si la imagen no carga, se muestra el marcador "sin imagen".

@@ -16,6 +16,8 @@ reconstruye la misma credencial.
   servidor.
 - **Foto:** se usa solo en el navegador para el PNG y el PDF. No cabe en el QR; al
   escanearlo, la credencial muestra el emblema de la corporación.
+- **Frente:** foto, nombre, crew, rol, ID, alta y, abajo a la derecha, el logo de la crew.
+- **Reverso:** el QR con el emblema de la corporación al centro (corrección de errores H).
 - **ID** `AA-XXXX`: se calcula a partir de los datos, siempre igual para la misma credencial.
 
 ## Unirse a una tripulación
@@ -29,6 +31,12 @@ La primera credencial de cada crew se crea con **Soy fundador de una tripulació
 (pide la misma contraseña).
 
 Hash: PBKDF2-SHA256, 210 000 iteraciones, sal `ad-astra:<crew>`, 16 bytes.
+
+### Logos de las crews
+
+Pon la imagen en `crews/` (PNG con fondo transparente, cuadrada) y añade su ruta en
+`config.json`, por ejemplo `"logo": "crews/C1.png"`. Sin logo, se dibuja un emblema con
+las iniciales y el color de la crew.
 
 ### Cambiar la contraseña de una crew
 
@@ -51,9 +59,11 @@ Todo ocurre en el navegador y el hash es público (va en cada QR y en `config.js
 index.html   página (crear y ver)
 app.js       lógica: formulario, codificación del enlace, QR, PNG y PDF
 style.css    estilos
-config.json  crews (nombre, color, hash de contraseña) y roles  ← EDITAR
+config.json  crews (nombre, color, logo, hash de contraseña) y roles  ← EDITAR
+crews/       logos de las crews (p. ej. crews/C1.png); se enlazan en config.json → crews.<id>.logo
 tools/       clave.mjs: calcula el hash de la contraseña de una crew
-logo.svg     logo (web)   logo.png  logo (para el PNG)
+logo.png     emblema circular   logo-negro.png / logo-blanco.png  constelación (el negro va en el QR)
+favicon.png  icono de la pestaña
 vendor/      html2canvas y qrcode-generator (MIT)
 .nojekyll    sirve los archivos tal cual en Pages
 ```
