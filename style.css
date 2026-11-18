@@ -87,7 +87,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--acento); ou
 .cred-sinfoto span { color: #8c919b; font-size: .72rem; letter-spacing: .25em; text-transform: uppercase; }
 
 /* Páginas */
-.crear { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3rem; max-width: 1320px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; align-items: start; }
+.crear { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 3rem; max-width: 1320px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+/* El formulario nunca baja de 360 px: si no cabe junto a la credencial, pasa arriba de ella. */
+.panel-form { flex: 1 1 360px; min-width: min(360px, 100%); max-width: 620px; }
+.panel-vista { flex: 0 1 auto; }
 .panel-form .sub { margin: .2rem 0 1.8rem; line-height: 1.55; }
 .panel-vista { position: sticky; top: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 1.2rem; }
 .ver { display: flex; flex-direction: column; align-items: center; gap: 1.2rem; padding: 2.5rem 1rem 4rem; }
@@ -103,8 +106,8 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 .estado { min-height: 1.5em; margin: 0; text-align: center; color: var(--tenue); word-break: break-all; }
 .estado.error { color: #d08a80; }
 @media (max-width: 1240px) {
-  .crear { grid-template-columns: minmax(0, 1fr); }
   .panel-vista { position: static; }
+  .panel-form { max-width: 760px; }
 }
 @media (max-width: 560px) { .fila { grid-template-columns: 1fr; } }
 
@@ -239,7 +242,7 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 /* Sin scroll horizontal: los fieldset no se encogen por defecto y la credencial no debe pasar del ancho */
 html, body { overflow-x: clip; }
 fieldset { min-width: 0; }
-.crear > *, .panel-vista, .ver > * { min-width: 0; max-width: 100%; }
+.panel-vista, .ver > * { min-width: 0; max-width: 100%; }
 .caras { max-width: 100%; }
 @media (max-width: 560px) {
   .crear { padding: 1.5rem 1rem 3rem; gap: 2rem; }
