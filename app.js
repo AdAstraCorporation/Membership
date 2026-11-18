@@ -619,7 +619,7 @@ let credencialActual = null; // { d, datos }: lo necesario para el QR y los IDs,
 // El reverso con el QR y los IDs de crew y tripulante no se muestran en pantalla: se generan
 // solo en el archivo descargado (PNG o PDF), para que una captura de la vista no sirva de credencial.
 async function completarParaDescarga(contenedor) {
-  if (!credencialActual) return;
+  if (!credencialActual || !contenedor.closest("#crear, .captura")) return;
   const { d, datos } = credencialActual;
   const id = await idDe(d);
   contenedor.querySelectorAll("[data-id-miembro]").forEach((e) => (e.textContent = id));
@@ -797,7 +797,9 @@ async function modoVer(datos) {
   const logoBlob = fuenteDe(paquete.logo);
   precargarImagenes(fotoBlob, logoBlob);
   nombreArchivo = `credencial-${slug(d.n)}`;
-  credencialActual = { d, datos };
+  // Una credencial escaneada no se puede descargar: así nadie baja la credencial de otra persona.
+  // Solo se descarga desde el formulario, al que se llega con la contraseña de la crew.
+  credencialActual = null;
   document.title = `${d.n} · Corporación Ad Astra`;
   history.replaceState(null, "", location.pathname + location.search); // el enlace no queda en la barra de direcciones
   // En pantalla solo el frente, sin IDs; el reverso con el QR se arma solo al descargar.

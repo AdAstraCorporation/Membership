@@ -233,8 +233,10 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 /* PDF: una cara por página */
 @media print {
   .caras { display: block; padding: 0; }
-  .cred-reverso { display: flex !important; }
-  .solo-descarga { display: revert !important; }
+  /* Solo la credencial propia (pantalla de crear) se imprime con reverso e IDs */
+  #crear .cred-reverso { display: flex !important; }
+  #crear .solo-descarga { display: revert !important; }
+  #ver { display: none !important; }
   .caras .credencial { break-after: page; page-break-after: always; margin: 0 auto; }
   .caras .credencial:last-child { break-after: auto; page-break-after: auto; }
 }

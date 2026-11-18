@@ -16,6 +16,9 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
   del tripulante: se generan solo en el archivo descargado (PNG o PDF). Así, una captura de la
   vista previa o de una credencial escaneada no sirve como credencial. Al abrir una credencial
   escaneada, el enlace se borra de la barra de direcciones, y no hay botón para copiarlo.
+  Una credencial escaneada **no se puede descargar ni imprimir**: así nadie baja la credencial
+  de otra persona. Solo se descarga desde el formulario, al que se llega con la contraseña de la
+  crew (al fundarla, al unirse o al renovar).
 - **Todo va en el QR.** El QR del reverso contiene la credencial completa: datos, foto y
   logo de la crew (estos dos como miniaturas WebP fijas de unos 100–160 px). Al escanearlo, la página
   la reconstruye. El sitio no recibe nada: los datos van en el fragmento `#C…` del enlace,
