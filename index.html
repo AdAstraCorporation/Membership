@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Credencial · Corporación Ad Astra</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="cabecera">
+    <a class="marca" href="./"><img class="logo" src="logo.svg" alt=""> Corporación Ad Astra</a>
+    <nav><a id="nav-crear" href="./">Crear credencial</a></nav>
+  </header>
+
+  <!-- Modo crear: formulario + vista previa -->
+  <main id="crear" class="crear" hidden>
+    <section class="panel-form">
+      <p class="eyebrow">Directorio de tripulación</p>
+      <h1>Tu credencial</h1>
+      <p class="sub">Llena tus datos y descarga tu identificación. Nada se guarda en ningún servidor:
+        el QR lleva tus datos y, al escanearlo, esta página reconstruye la credencial.</p>
+
+      <form id="form" autocomplete="off">
+        <label>Nombre de tu fursona <input name="n" required maxlength="40"></label>
+        <div class="fila">
+          <label>Especie <input name="e" required maxlength="40"></label>
+          <label><span>Pronombres <span class="opcional">(opcional)</span></span> <input name="p" maxlength="20"></label>
+        </div>
+        <div class="fila">
+          <label>Crew <select name="c" required></select></label>
+          <label>Rol <select name="r" required></select></label>
+        </div>
+        <label>Fecha de alta <input name="a" type="date" required></label>
+
+        <fieldset>
+          <legend>Imagen</legend>
+          <label>Desde tu equipo <span class="opcional">(se usa solo para el PNG y el PDF)</span>
+            <input name="foto" type="file" accept="image/*">
+          </label>
+          <label>Enlace a la imagen <span class="opcional">(opcional: es la que aparece al escanear el QR)</span>
+            <input name="i" type="url" maxlength="300" placeholder="https://…">
+            <small class="ayuda">La imagen no cabe dentro del QR; si quieres que se vea al escanearlo,
+              súbela a un sitio público y pega aquí el enlace directo.</small>
+          </label>
+        </fieldset>
+      </form>
+    </section>
+
+    <section class="panel-vista">
+      <div id="vista-crear"></div>
+      <div class="acciones">
+        <button class="boton" data-accion="png">Descargar PNG</button>
+        <button class="boton secundario" data-accion="pdf">Guardar como PDF</button>
+        <button class="boton secundario" data-accion="copiar">Copiar enlace</button>
+      </div>
+      <p id="estado" class="estado" role="status"></p>
+    </section>
+  </main>
+
+  <!-- Modo ver: credencial reconstruida desde el QR -->
+  <main id="ver" class="ver" hidden>
+    <div id="vista-ver"></div>
+    <div class="acciones">
+      <button class="boton" data-accion="png">Descargar PNG</button>
+      <button class="boton secundario" data-accion="pdf">Guardar como PDF</button>
+      <a class="boton secundario" href="./">Crear mi credencial</a>
+    </div>
+    <p class="aviso">Credencial reconstruida a partir de su QR. No se verifica contra ningún registro.</p>
+  </main>
+
+  <main id="error" class="ver" hidden>
+    <p class="vacio">Este enlace no contiene una credencial válida.</p>
+    <a class="boton" href="./">Crear una credencial</a>
+  </main>
+
+  <script src="vendor/html2canvas.min.js" defer></script>
+  <script src="vendor/qrcode.js" defer></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
