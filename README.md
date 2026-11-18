@@ -41,6 +41,10 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
   (`lh3.googleusercontent.com/…`) se ajusta a 512 px (`=s512`). El enlace de *compartir* de
   Google Fotos (`photos.app.goo.gl/…`) es una página, no una imagen, y convertirlo exigiría un
   servidor: la página lo detecta y guía para copiar la dirección de la imagen.
+- **iCloud** no sirve: sus enlaces abren una página y las direcciones directas de sus fotos
+  caducan pronto. La página lo explica y sugiere subir el archivo o usar Google Drive o Fotos.
+- Imágenes cuyo sitio no permite copiarlas (sin CORS, como Google Fotos o Drive): se ven en
+  pantalla, al escanear y en el PDF; en el PNG van con el emblema en su lugar y se avisa.
 - Bytes (v3, binario): cabecera de 29 bytes (banderas, ID de crew en 30 bits, color RGB,
   emisión en días desde 2020, hash crudo de 16 bytes), textos separados por `␟` y comprimidos
   solo si ahorra, y por imagen `[tipo<<4|formato][largo][bytes]`.
@@ -64,8 +68,8 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
 - Con foto y logo el QR es denso (versión ~35, cerca de 40 con GIF animados). Se lee bien desde la pantalla o impreso a
   buen tamaño; muy pequeño puede costar.
 - El vencimiento usa el reloj del dispositivo que escanea.
-- Una imagen enlazada solo sale en el PNG si su sitio permite CORS; si no, se ve en pantalla
-  pero falta en el PNG (subir el archivo lo resuelve).
+- Una imagen enlazada solo sale en el PNG si su sitio permite CORS (Google no lo permite);
+  si no, el PNG lleva el emblema en su lugar. El PDF sí la incluye; subir el archivo también.
 
 ## Archivos
 

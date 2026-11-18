@@ -138,6 +138,15 @@ function normalizarEnlace(valor) {
   }
   return v;
 }
+// Enlaces que no se pueden usar como imagen sin un servidor, con el motivo para el usuario.
+function enlaceNoUtilizable(valor) {
+  const v = (valor ?? "").trim();
+  if (/^https:\/\/((www|share)\.)?icloud\.com\//i.test(v))
+    return "Los enlaces de iCloud abren una página, y las direcciones directas de sus fotos caducan en poco tiempo, así que no sirven para una credencial. Sube el archivo o compártela desde Google Drive o Google Fotos.";
+  if (/^https:\/\/drive\.google\.com\/drive\/(u\/\d+\/)?folders\//i.test(v))
+    return "Ese enlace es de una carpeta de Google Drive. Abre la imagen, usa Compartir → Copiar enlace y pega el enlace del archivo.";
+  return "";
+}
 const esPaginaGoogleFotos = (valor) => /^https:\/\/(photos\.app\.goo\.gl|goo\.gl\/photos|photos\.google\.com)\//i.test((valor ?? "").trim());
 const imagenEnlace = (u) => ({ mime: "enlace", enlace: u.trim(), bytes: new TextEncoder().encode(u.trim()) });
 const SEP = "\x1f"; // separador de los textos
@@ -721,10 +730,12 @@ function precargarEnlace(campo) {
     precargas.delete(campo);
     return Promise.resolve(false);
   }
-  if (!enlaceValido(valor)) {
+  const motivo = enlaceNoUtilizable(valor);
+  if (motivo || !enlaceValido(valor)) {
     img.hidden = true;
     caja.classList.add("error");
-    texto.textContent = "Debe empezar por https:// y no tener espacios.";
+    texto.textContent = motivo || "Debe empezar por https:// y no tener espacios.";
+    precargas.delete(campo);
     return Promise.resolve(false);
   }
   if (precargas.get(campo)?.valor === valor) return precargas.get(campo).promesa;
@@ -739,7 +750,9 @@ function precargarEnlace(campo) {
     };
     img.onerror = () => {
       caja.classList.add("error");
-      texto.textContent = "No se pudo cargar la imagen. Revisa el enlace.";
+      texto.textContent = /^https:\/\/lh\d\.googleusercontent\.com\/d\//i.test(valor)
+        ? "No se pudo cargar. En Google Drive, el archivo debe estar compartido con «Cualquier persona con el enlace»."
+        : "No se pudo cargar la imagen. Revisa el enlace.";
       ok(false);
     };
     img.src = valor;
@@ -781,6 +794,28 @@ const cargarHtml2canvas = () =>
     document.head.append(sc);
   }));
 
+// Comprueba si cada imagen enlazada se puede copiar (CORS) y reemplaza las que no.
+const sePuedeCopiar = (src) =>
+  new Promise((ok) => {
+    const i = new Image();
+    i.crossOrigin = "anonymous";
+    i.referrerPolicy = "no-referrer";
+    i.onload = () => ok(true);
+    i.onerror = () => ok(false);
+    i.src = src;
+  });
+async function sinPermisoDeCopia(contenedor) {
+  const externas = [...contenedor.querySelectorAll("img")].filter((i) => /^https:/i.test(i.getAttribute("src") ?? ""));
+  let n = 0;
+  for (const img of externas) {
+    if (await sePuedeCopiar(img.src)) continue;
+    n++;
+    if (img.matches(".crew-logo")) img.replaceWith(Object.assign(document.createElement("div"), { className: "crew-logo crew-logo-generado" }));
+    else img.outerHTML = `<div class="cred-sinfoto"><img src="logo.png" alt=""><span>Imagen enlazada</span></div>`;
+  }
+  return n;
+}
+
 // Descarga dos PNG individuales: frente y reverso.
 const descargar = (url, nombre) => Object.assign(document.createElement("a"), { href: url, download: nombre }).click();
 async function descargarPng(boton) {
@@ -790,7 +825,6 @@ async function descargarPng(boton) {
     await cargarHtml2canvas();
     const caras = document.querySelector("main:not([hidden]) .caras"); // la credencial de la pantalla visible
     if (!caras) return;
-    const externas = [...caras.querySelectorAll("img")].some((i) => /^https:/i.test(i.getAttribute("src") ?? ""));
     // Copia fija de la credencial: si la vista se vuelve a dibujar mientras se generan los PNG
     // (una imagen que termina de cargar, el usuario que sigue escribiendo), no afecta la captura.
     capa = document.createElement("div");
@@ -800,6 +834,9 @@ async function descargarPng(boton) {
     capa.append(copia);
     document.body.append(capa);
     await Promise.all([...copia.querySelectorAll("img")].map((i) => (i.complete ? null : i.decode().catch(() => null))));
+    // Imágenes enlazadas cuyo sitio no permite copiarlas (sin CORS, como Google Fotos): en el
+    // PNG van con el emblema en su lugar, en vez de dejar un hueco. El PDF sí las incluye.
+    const bloqueadas = await sinPermisoDeCopia(copia);
     const [frente, reverso] = copia.querySelectorAll(".credencial");
     for (const [cara, sufijo] of [[frente, "frente"], [reverso, "reverso"]]) {
       const canvas = await window.html2canvas(cara, { scale: 3, backgroundColor: null, useCORS: true });
@@ -810,8 +847,8 @@ async function descargarPng(boton) {
       await new Promise((r) => setTimeout(r, 400)); // pausa entre descargas: algunos navegadores bloquean dos seguidas
     }
     estado(
-      externas
-        ? "Se descargaron el frente y el reverso. Si alguna imagen enlazada no aparece, su sitio no permite copiarla (CORS): sube el archivo."
+      bloqueadas
+        ? "Se descargaron el frente y el reverso. El sitio de la imagen enlazada (por ejemplo Google Fotos) no permite copiarla en un PNG, así que va el emblema en su lugar. El PDF sí la incluye; o sube el archivo para el PNG."
         : "Se descargaron el frente y el reverso."
     );
   } catch (e) {
@@ -983,7 +1020,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   let logoUrl = logoFuente && URL.createObjectURL(logoFuente);
   const enlace = (campo) => {
     const v = normalizarEnlace(campo.value);
-    return enlaceValido(v) && !esPaginaGoogleFotos(v) ? v : "";
+    return enlaceValido(v) && !esPaginaGoogleFotos(v) && !enlaceNoUtilizable(v) ? v : "";
   };
   let miniFoto = null;
   let miniLogo = null;
