@@ -14,23 +14,9 @@
 <body>
   <header class="cabecera">
     <a class="marca" href="./"><img class="logo" src="logo.png" alt=""> Corporación Ad Astra</a>
-    <nav><a href="./">Inicio</a></nav>
+    <nav><a href="./">Fundar una crew</a></nav>
   </header>
 
-  <!-- Inicio -->
-  <main id="inicio" class="inicio" hidden>
-    <img class="inicio-logo" src="logo.png" alt="">
-    <p class="eyebrow">Directorio de tripulación</p>
-    <h1>Per aspera ad astra</h1>
-    <p class="sub">Genera tu credencial de tripulante. El sitio no guarda nada: toda la credencial viaja
-      en su QR, y las credenciales vencen al año.</p>
-    <ol class="pasos">
-      <li>Escanea el QR de la credencial de un miembro de la tripulación.</li>
-      <li>Pulsa <strong>Unirme a esta tripulación</strong> y escribe la contraseña de la crew.</li>
-      <li>Llena tus datos y descarga tu credencial. Tu QR también servirá para invitar.</li>
-    </ol>
-    <button class="boton secundario" data-accion="fundar">Fundar una crew</button>
-  </main>
 
   <!-- Contraseña: fundar, unirse o renovar -->
   <main id="clave" class="ver" hidden>
@@ -39,6 +25,8 @@
       <h2 id="clave-titulo"></h2>
       <p id="clave-id" class="id-crew"></p>
       <p id="clave-ayuda" class="ayuda"></p>
+      <p id="nota-unirse" class="ayuda nota-unirse" hidden>¿Quieres unirte a una crew que ya existe? Escanea el QR de
+        la credencial de uno de sus miembros.</p>
       <div id="clave-fundar" class="grupo-campos" hidden>
         <label>Nombre de la crew <input name="crew" maxlength="30"></label>
         <label>Color
@@ -111,6 +99,10 @@
               </span></label>
           </div>
           <small id="logo-heredado" class="ayuda" hidden>Ya tienes el logo de tu crew, tomado del QR con el que te uniste. Sube otro solo si quieres cambiarlo.</small>
+          <p class="aviso-calidad"><strong>Ojo:</strong> si subes un archivo, la imagen se guarda dentro del QR
+            muy reducida y <strong>pierde mucha calidad al escanearlo</strong> (tu PNG y tu PDF sí la usan
+            completa). Para que se vea bien al escanear, usa un enlace.</p>
+          <div id="calidad-qr" class="calidad-qr" hidden></div>
           <small class="ayuda">Un archivo viaja dentro del QR en miniatura (se admiten GIF animados, que
             hacen el QR más denso). Con un <strong>enlace</strong>, el QR guarda solo la dirección: más
             liviano y la imagen se ve en su calidad original, pero depende de que el enlace siga activo y
@@ -147,7 +139,7 @@
 
   <main id="error" class="ver" hidden>
     <p class="vacio">Este enlace no contiene una credencial válida.</p>
-    <a class="boton" href="./">Ir al inicio</a>
+    <a class="boton" href="./">Fundar una crew</a>
   </main>
 
   <script src="vendor/qrcode.min.js" defer></script>

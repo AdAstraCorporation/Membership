@@ -225,4 +225,10 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 .ayuda-enlace .boton { padding: .45rem .8rem; font-size: .85rem; }
 .ayuda-enlace small { color: var(--tenue); font-weight: 400; font-size: .8rem; line-height: 1.5; }
 .ayuda-enlace code { font-size: .75rem; color: var(--texto); }
+.aviso-calidad { margin: 0; padding: .7rem .9rem; border-radius: 8px; border: 1px solid #a36a6a66; background: #a36a6a1a; font-size: .85rem; line-height: 1.5; color: var(--texto); }
+.calidad-qr { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+.calidad-qr figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: .3rem; }
+.calidad-qr img { width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; border-radius: 6px; border: 1px solid var(--borde); background: #ecebe6; }
+.calidad-qr figcaption { font-size: .75rem; color: var(--tenue); text-align: center; max-width: 120px; }
+.nota-unirse { margin: 0; padding-bottom: .9rem; border-bottom: 1px solid var(--borde); }
 .grupo-campos { display: flex; flex-direction: column; gap: 1rem; }

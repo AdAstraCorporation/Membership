@@ -919,7 +919,7 @@ document.addEventListener("click", async (e) => {
 });
 
 function mostrar(id) {
-  for (const s of ["inicio", "clave", "crear", "ver", "error"]) $(s).hidden = s !== id;
+  for (const s of ["clave", "crear", "ver", "error"]) $(s).hidden = s !== id;
   if (id !== "crear") $("vista-crear").innerHTML = "";
   window.scrollTo(0, 0);
 }
@@ -983,11 +983,13 @@ function modoClave({ modo, d, logo, foto }) {
   form.reset();
   const fundar = modo === "fundar";
   $("clave-fundar").hidden = !fundar;
+  $("nota-unirse").hidden = !fundar;
   if (fundar) pintarMuestras($("muestras-crew"), "estilo", "1");
   $("campo-confirmar").hidden = !fundar;
   $("clave-eyebrow").textContent = { fundar: "Fundar una crew", unirse: "Unirse a la tripulación", renovar: "Renovar credencial" }[modo];
   $("clave-titulo").textContent = fundar ? "Nueva crew" : `Crew ${d.c}`;
   $("clave-id").textContent = fundar ? "" : d.i;
+  $("clave-id").hidden = fundar;
   $("clave-ayuda").textContent = fundar
     ? "Elige el nombre, el color y la contraseña. La crew recibirá un ID único. Comparte la contraseña solo con quien quieras invitar: cada miembro podrá invitar a otros con su QR."
     : modo === "renovar"
@@ -1042,6 +1044,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   if (lider && !form.r.value) form.r.value = "Líder";
   $("logo-heredado").hidden = !logoHeredado;
   for (const id of ["precarga-fotoEnlace", "precarga-logoEnlace"]) $(id).hidden = true;
+  $("calidad-qr").hidden = true;
   // Enlaces heredados (logo de la crew) o previos (renovación) se ponen en sus campos.
   if (logoHeredado?.enlace) form.logoEnlace.value = logoHeredado.enlace;
   if (previo?.foto?.enlace) form.fotoEnlace.value = previo.foto.enlace;
@@ -1083,6 +1086,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
       const fotoNueva = fotoEmbebida ? await miniatura(fotoEmbebida, resto, { cuadrado: true }) : null;
       if (mia !== versionMini) return false;
       [miniLogo, miniFoto] = [logoNuevo, fotoNueva];
+      await mostrarCalidadQr({ foto: fotoNueva, logo: logoNuevo });
       estado("");
       return true;
     } catch {
@@ -1126,6 +1130,28 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
     if (campo.value) precargarEnlace(campo); // enlace heredado o de la renovación
   }
 
+  // Muestra cómo quedan dentro del QR las imágenes subidas como archivo (tamaño real y vista).
+  async function mostrarCalidadQr(minis) {
+    const caja = $("calidad-qr");
+    const partes = [];
+    for (const [img, nombre] of [[minis.foto, "Tu foto"], [minis.logo, "Logo de la crew"]]) {
+      if (!img) continue;
+      const blob = new Blob([img.bytes], { type: img.mime });
+      let tam = "";
+      try {
+        const bmp = await createImageBitmap(blob);
+        tam = `${bmp.width}×${bmp.height} px`;
+        bmp.close();
+      } catch {
+        /* sin tamaño */
+      }
+      partes.push(`<figure><img src="${URL.createObjectURL(blob)}" alt="">
+        <figcaption>${nombre} al escanear: ${tam}${img.mime === "image/gif" ? " · animado" : ""}</figcaption></figure>`);
+    }
+    caja.hidden = !partes.length;
+    caja.innerHTML = partes.join("");
+  }
+
   let turno = 0;
   async function pintar() {
     const mio = ++turno;
@@ -1165,5 +1191,5 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
 // ---------- Arranque ----------
 const m = /^#C([0-9A-Z$*+\-./:]+)$/.exec(location.hash);
 if (m) modoVer(m[1]);
-else mostrar("inicio");
+else modoClave({ modo: "fundar" }); // sin QR, lo único posible es fundar una crew
 window.addEventListener("hashchange", () => location.reload());

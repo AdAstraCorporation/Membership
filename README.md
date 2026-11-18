@@ -8,10 +8,15 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
 
 ## Cómo funciona
 
+- **Calidad.** Una imagen subida como archivo viaja en el QR muy reducida y pierde mucha
+  calidad al escanear; la página lo avisa y muestra el tamaño real y cómo se verá. Con un
+  enlace se conserva la calidad original.
 - **Todo va en el QR.** El QR del reverso contiene la credencial completa: datos, foto y
   logo de la crew (estos dos como miniaturas WebP de unos 100–160 px, o **GIF animados**). Al escanearlo, la página
   la reconstruye. El sitio no recibe nada: los datos van en el fragmento `#C…` del enlace,
   que el navegador no envía al servidor.
+- **Entrada.** La página abre directamente el formulario para fundar una crew (sin QR es lo
+  único posible); para unirse a una existente se escanea el QR de un miembro.
 - **Crews.** Cualquiera puede fundar una: nombre, color, estilo y contraseña. Recibe un
   **ID único** (`CR-XXXXXX`), así que dos crews con el mismo nombre son distintas.
 - **Unirse.** Se escanea el QR de un miembro, se pulsa *Unirme a esta tripulación* y se
