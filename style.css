@@ -212,6 +212,22 @@ legend { padding: 0 .4rem; color: var(--acento); font-size: .8rem; letter-spacin
 
 /* Copia temporal para generar los PNG, fuera de pantalla */
 .captura { position: fixed; left: -10000px; top: 0; }
+.captura .caras.juntas { max-width: none; flex-wrap: nowrap; padding: 24px; gap: 24px; }
+
+/* Diálogo: ¿PNG separado o junto? */
+.dialogo { border: 1px solid var(--borde); border-radius: 14px; background: var(--panel); color: var(--texto); padding: 1.4rem; width: min(440px, calc(100vw - 2rem)); }
+.dialogo::backdrop { background: #000a; }
+.dialogo h2 { font-family: var(--serif); font-weight: 500; font-size: 1.35rem; margin: 0 0 1rem; }
+.dialogo > .ayuda { display: block; margin: .9rem 0 1rem; }
+.opciones-png { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+.opcion-png { display: flex; flex-direction: column; align-items: center; gap: .35rem; padding: 1rem .6rem; cursor: pointer; font: inherit; text-align: center;
+  background: var(--fondo); color: var(--texto); border: 1px solid var(--borde); border-radius: 10px; }
+.opcion-png:hover, .opcion-png:focus-visible { border-color: var(--acento); outline: none; }
+.opcion-png small { color: var(--tenue); font-size: .78rem; line-height: 1.35; }
+.opcion-png .mini-caras { display: inline-flex; gap: 4px; margin-bottom: .3rem; }
+.mini-caras.separadas { gap: 12px; padding: 4px; }
+.mini-caras i { display: block; width: 22px; height: 34px; border-radius: 3px; border: 2px solid var(--acento); }
+.mini-caras.juntas { padding: 3px; border: 1px dashed var(--tenue); border-radius: 5px; }
 
 /* PDF: una cara por página */
 @media print {

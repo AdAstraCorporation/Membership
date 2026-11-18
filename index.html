@@ -136,7 +136,7 @@
     <section class="panel-vista">
       <div id="vista-crear"></div>
       <div class="acciones">
-        <button class="boton" data-accion="png" title="Se bajan dos archivos, el frente y el reverso. Si el navegador pregunta, acepta las descargas múltiples.">Descargar PNG (frente y reverso)</button>
+        <button class="boton" data-accion="png">Descargar PNG</button>
         <button class="boton secundario" data-accion="pdf">Guardar como PDF</button>
         <button class="boton secundario" data-accion="copiar">Copiar enlace</button>
       </div>
@@ -150,7 +150,7 @@
     <div class="acciones">
       <button id="boton-unirse" class="boton" hidden>Unirme a esta tripulación</button>
       <button id="boton-renovar" class="boton secundario" hidden>Renovar</button>
-      <button class="boton secundario" data-accion="png" title="Se bajan dos archivos, el frente y el reverso. Si el navegador pregunta, acepta las descargas múltiples.">Descargar PNG (frente y reverso)</button>
+      <button class="boton secundario" data-accion="png">Descargar PNG</button>
       <button class="boton secundario" data-accion="pdf">Guardar como PDF</button>
     </div>
     <p id="ver-aviso" class="aviso"></p>
@@ -160,6 +160,22 @@
     <p class="vacio">Este enlace no trae una credencial válida.</p>
     <a class="boton" href="./">Fundar una crew</a>
   </main>
+
+  <dialog id="dialogo-png" class="dialogo">
+    <h2>¿Cómo quieres el PNG?</h2>
+    <div class="opciones-png">
+      <button type="button" class="opcion-png" data-formato="separadas">
+        <span class="mini-caras separadas" aria-hidden="true"><i></i><i></i></span>
+        <strong>Por separado</strong><small>Dos archivos: el frente y el reverso</small>
+      </button>
+      <button type="button" class="opcion-png" data-formato="juntas">
+        <span class="mini-caras juntas" aria-hidden="true"><i></i><i></i></span>
+        <strong>Juntas</strong><small>Una sola imagen con las dos caras</small>
+      </button>
+    </div>
+    <small class="ayuda">Si eliges por separado y el navegador pregunta, acepta descargar varios archivos.</small>
+    <button type="button" class="boton secundario" data-formato="cancelar">Cancelar</button>
+  </dialog>
 
   <script src="vendor/qrcode.min.js" defer></script>
   <script type="module" src="app.js"></script>

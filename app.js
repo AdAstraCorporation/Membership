@@ -682,7 +682,20 @@ async function prepararImagenesExternas(contenedor) {
 
 // Descarga dos PNG individuales: frente y reverso.
 const descargar = (url, nombre) => Object.assign(document.createElement("a"), { href: url, download: nombre }).click();
-async function descargarPng(boton) {
+// Antes de descargar, pregunta si las caras van en archivos separados o en una sola imagen.
+function preguntarFormatoPng(boton) {
+  const dlg = $("dialogo-png");
+  dlg.querySelectorAll("[data-formato]").forEach((b) => {
+    b.onclick = () => {
+      dlg.close();
+      if (b.dataset.formato !== "cancelar") descargarPng(boton, b.dataset.formato);
+    };
+  });
+  dlg.showModal();
+}
+
+// modo: "separadas" (frente y reverso en dos archivos) o "juntas" (una imagen con las dos caras)
+async function descargarPng(boton, modo = "separadas") {
   boton.disabled = true;
   let capa = null;
   try {
@@ -703,18 +716,21 @@ async function descargarPng(boton) {
     estado("Preparando las imágenes…");
     const bloqueadas = await prepararImagenesExternas(copia);
     const [frente, reverso] = copia.querySelectorAll(".credencial");
-    for (const [cara, sufijo] of [[frente, "frente"], [reverso, "reverso"]]) {
-      const canvas = await window.html2canvas(cara, { scale: 3, backgroundColor: null, useCORS: true });
+    const piezas = modo === "juntas" ? [[copia, ""]] : [[frente, "-frente"], [reverso, "-reverso"]];
+    if (modo === "juntas") copia.classList.add("juntas");
+    for (const [elemento, sufijo] of piezas) {
+      const canvas = await window.html2canvas(elemento, { scale: 3, backgroundColor: null, useCORS: true });
       const blob = await new Promise((r) => canvas.toBlob(r, "image/png"));
       const url = URL.createObjectURL(blob);
-      descargar(url, `${nombreArchivo}-${sufijo}.png`);
+      descargar(url, `${nombreArchivo}${sufijo}.png`);
       setTimeout(() => URL.revokeObjectURL(url), 10000);
-      await new Promise((r) => setTimeout(r, 400)); // pausa entre descargas: algunos navegadores bloquean dos seguidas
+      if (piezas.length > 1) await new Promise((r) => setTimeout(r, 400)); // algunos navegadores bloquean dos descargas seguidas
     }
+    const hecho = modo === "juntas" ? "Listo: descargaste las dos caras en una imagen." : "Listo: frente y reverso descargados.";
     estado(
       bloqueadas
-        ? "Listo: frente y reverso descargados. No pude traer la imagen enlazada para el PNG, así que va el emblema en su lugar. Si la quieres, guarda el PDF o sube el archivo."
-        : "Listo: frente y reverso descargados."
+        ? `${hecho} No pude traer la imagen enlazada para el PNG, así que va el emblema en su lugar. Si la quieres, guarda el PDF o sube el archivo.`
+        : hecho
     );
   } catch (e) {
     console.error("PNG:", e);
@@ -730,7 +746,7 @@ document.addEventListener("click", async (e) => {
   if (!b) return;
   const accion = b.dataset.accion;
   if (accion === "pdf") window.print();
-  if (accion === "png") descargarPng(b);
+  if (accion === "png") preguntarFormatoPng(b);
   if (accion === "fundar" || accion === "volver-fundar") modoClave({ modo: "fundar" });
   if (accion === "unirse-qr") modoLeerQr();
   if (accion === "copiar") {
