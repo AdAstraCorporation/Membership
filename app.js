@@ -131,6 +131,23 @@ function normalizarEnlace(valor) {
       return `https://lh3.googleusercontent.com/d/${id}${clave ? `?resourcekey=${clave}` : ""}`;
     }
   }
+  // Imgur: página de una imagen → imagen directa (Imgur sirve la imagen con cualquier extensión)
+  if (/^(www\.|m\.)?imgur\.com$/.test(u.hostname)) {
+    const id = u.pathname.match(/^\/([A-Za-z0-9]{5,8})$/)?.[1];
+    if (id) return `https://i.imgur.com/${id}.jpg`;
+  }
+  // X: imagen directa a tamaño mediano (name=small, 680 px)
+  if (u.hostname === "pbs.twimg.com" && u.pathname.startsWith("/media/")) {
+    u.searchParams.set("name", "small");
+    if (!u.searchParams.has("format")) {
+      const ext = u.pathname.match(/\.(jpe?g|png|webp|gif)$/i)?.[1];
+      if (ext) {
+        u.pathname = u.pathname.replace(/\.\w+$/, "");
+        u.searchParams.set("format", ext.toLowerCase());
+      }
+    }
+    return u.toString();
+  }
   if (/^lh\d\.googleusercontent\.com$/.test(u.hostname) && !u.pathname.startsWith("/d/") && !u.search) {
     // El tamaño va al final tras "=" (p. ej. =w2400-h1600-no); se reemplaza por uno fijo.
     const base = u.pathname.replace(/=[\w-]*$/, "");
@@ -138,16 +155,38 @@ function normalizarEnlace(valor) {
   }
   return v;
 }
-// Enlaces que no se pueden usar como imagen sin un servidor, con el motivo para el usuario.
-function enlaceNoUtilizable(valor) {
+// Revisión de enlaces por plataforma. Sin servidor no se puede leer una página para sacar su
+// imagen, así que con un enlace de publicación se guía al usuario para copiar la dirección
+// directa de la imagen, y se avisa cuando la plataforma hace caducar esas direcciones.
+//   motivo: qué pasa · abrir: mostrar botón para abrir el enlace · pista: qué copiar
+const COPIAR = "Ábrela, mantén pulsada la imagen (celular) o haz clic derecho (computador), elige «Copiar dirección de la imagen» y pega aquí ese enlace";
+const REGLAS_ENLACES = [
+  // No sirven: páginas sin imagen accesible o direcciones que caducan
+  [/^https:\/\/((www|share)\.)?icloud\.com\//i, { motivo: "Los enlaces de iCloud abren una página y las direcciones de sus fotos caducan pronto, así que la credencial se rompería. Sube el archivo o compártela desde Google Drive o Google Fotos." }],
+  [/^https:\/\/([\w-]+\.)*(cdninstagram\.com|fbcdn\.net)\//i, { motivo: "Las direcciones de imágenes de Instagram y Facebook caducan, así que la credencial se rompería. Sube el archivo." }],
+  [/^https:\/\/((www|m|web)\.)?(instagram\.com|instagr\.am|facebook\.com|fb\.com|fb\.watch|threads\.net|threads\.com)\//i, { motivo: "Instagram, Facebook y Threads no permiten usar sus imágenes fuera de la app y sus direcciones caducan. Sube el archivo." }],
+  [/^https:\/\/(cdn|media)\.discordapp\.(com|net)\//i, { motivo: "Los enlaces de imágenes de Discord caducan en unas 24 horas, así que la credencial se rompería. Sube el archivo." }],
+  [/^https:\/\/((www|ptb|canary)\.)?(discord\.com|discord\.gg|discordapp\.com)\//i, { motivo: "Los enlaces de imágenes de Discord caducan en unas 24 horas, así que la credencial se rompería. Sube el archivo." }],
+  [/^https:\/\/((www|vm|vt|m)\.)?tiktok\.com\//i, { motivo: "TikTok no permite usar sus imágenes fuera de la app. Sube el archivo." }],
+  [/^https:\/\/(t\.me|telegram\.me|web\.telegram\.org)\//i, { motivo: "Telegram no ofrece enlaces directos a imágenes. Sube el archivo." }],
+  [/^https:\/\/drive\.google\.com\/drive\/(u\/\d+\/)?folders\//i, { motivo: "Ese enlace es de una carpeta de Google Drive. Abre la imagen, usa Compartir → Copiar enlace y pega el enlace del archivo." }],
+  // Sirven, pero el enlace es de una página: se guía para copiar la imagen directa
+  [/^https:\/\/(photos\.app\.goo\.gl|goo\.gl\/photos|photos\.google\.com)\//i, { motivo: "Ese enlace abre la página de Google Fotos, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://lh3.googleusercontent.com/. El álbum debe seguir compartido.` }],
+  [/^https:\/\/((www|mobile)\.)?(x\.com|twitter\.com)\//i, { motivo: "Ese enlace abre la publicación de X, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://pbs.twimg.com/.` }],
+  [/^https:\/\/((www|old|new)\.)?(reddit\.com|redd\.it)\//i, { motivo: "Ese enlace abre la publicación de Reddit, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://i.redd.it/.` }],
+  [/^https:\/\/(([\w-]+\.)?pinterest\.[a-z.]+|pin\.it)\//i, { motivo: "Ese enlace abre el pin de Pinterest, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://i.pinimg.com/.` }],
+  [/^https:\/\/(www\.)?bsky\.app\//i, { motivo: "Ese enlace abre la publicación de Bluesky, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://cdn.bsky.app/.` }],
+  [/^https:\/\/([\w-]+\.)?tumblr\.com\//i, { motivo: "Ese enlace abre la publicación de Tumblr, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://64.media.tumblr.com/.` }],
+  [/^https:\/\/(www\.)?furaffinity\.net\//i, { motivo: "Ese enlace abre la página de Fur Affinity, no la imagen.", abrir: true, pista: `${COPIAR}: empieza por https://d.furaffinity.net/.` }],
+  [/^https:\/\/(www\.)?deviantart\.com\//i, { motivo: "Ese enlace abre la página de DeviantArt, no la imagen.", abrir: true, pista: `${COPIAR}. Algunas imágenes de DeviantArt llevan un permiso temporal; si deja de verse, sube el archivo.` }],
+  [/^https:\/\/(www\.)?imgur\.com\/(a|gallery|t)\//i, { motivo: "Ese enlace es de un álbum de Imgur.", abrir: true, pista: `${COPIAR}: empieza por https://i.imgur.com/.` }],
+];
+function revisarEnlace(valor) {
   const v = (valor ?? "").trim();
-  if (/^https:\/\/((www|share)\.)?icloud\.com\//i.test(v))
-    return "Los enlaces de iCloud abren una página, y las direcciones directas de sus fotos caducan en poco tiempo, así que no sirven para una credencial. Sube el archivo o compártela desde Google Drive o Google Fotos.";
-  if (/^https:\/\/drive\.google\.com\/drive\/(u\/\d+\/)?folders\//i.test(v))
-    return "Ese enlace es de una carpeta de Google Drive. Abre la imagen, usa Compartir → Copiar enlace y pega el enlace del archivo.";
-  return "";
+  for (const [re, info] of REGLAS_ENLACES) if (re.test(v)) return info;
+  return null;
 }
-const esPaginaGoogleFotos = (valor) => /^https:\/\/(photos\.app\.goo\.gl|goo\.gl\/photos|photos\.google\.com)\//i.test((valor ?? "").trim());
+
 const imagenEnlace = (u) => ({ mime: "enlace", enlace: u.trim(), bytes: new TextEncoder().encode(u.trim()) });
 const SEP = "\x1f"; // separador de los textos
 const EPOCA = Date.UTC(2020, 0, 1);
@@ -713,7 +752,7 @@ function precargarEnlace(campo) {
   const texto = caja.querySelector("small");
   const original = campo.value.trim();
   const valor = normalizarEnlace(original);
-  const ayuda = caja.parentElement.querySelector(".ayuda-google"); // va junto a la caja, en el mismo campo
+  const ayuda = caja.parentElement.querySelector(".ayuda-enlace"); // va junto a la caja, en el mismo campo
   ayuda.hidden = true;
   caja.classList.remove("error");
   if (!valor) {
@@ -721,16 +760,18 @@ function precargarEnlace(campo) {
     return Promise.resolve(false);
   }
   caja.hidden = false;
-  if (esPaginaGoogleFotos(valor)) {
+  const revision = revisarEnlace(valor);
+  if (revision?.abrir) {
     img.hidden = true;
     caja.classList.add("error");
-    texto.textContent = "Ese enlace abre la página de Google Fotos, no la imagen.";
+    texto.textContent = revision.motivo;
     ayuda.querySelector("a").href = valor;
+    ayuda.querySelector("small").textContent = revision.pista;
     ayuda.hidden = false;
     precargas.delete(campo);
     return Promise.resolve(false);
   }
-  const motivo = enlaceNoUtilizable(valor);
+  const motivo = revision?.motivo;
   if (motivo || !enlaceValido(valor)) {
     img.hidden = true;
     caja.classList.add("error");
@@ -744,7 +785,7 @@ function precargarEnlace(campo) {
   const promesa = new Promise((ok) => {
     img.onload = () => {
       img.hidden = false;
-      const google = valor !== original ? " · enlace de Google ajustado" : "";
+      const google = valor !== original ? " · enlace ajustado" : "";
       texto.textContent = `Lista · ${img.naturalWidth}×${img.naturalHeight}${google}`;
       ok(true);
     };
@@ -1020,7 +1061,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   let logoUrl = logoFuente && URL.createObjectURL(logoFuente);
   const enlace = (campo) => {
     const v = normalizarEnlace(campo.value);
-    return enlaceValido(v) && !esPaginaGoogleFotos(v) && !enlaceNoUtilizable(v) ? v : "";
+    return enlaceValido(v) && !revisarEnlace(v) ? v : "";
   };
   let miniFoto = null;
   let miniLogo = null;

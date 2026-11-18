@@ -41,8 +41,14 @@ incluyen las dos caras. No guarda nada y funciona aislado: no consume ningún se
   (`lh3.googleusercontent.com/…`) se ajusta a 512 px (`=s512`). El enlace de *compartir* de
   Google Fotos (`photos.app.goo.gl/…`) es una página, no una imagen, y convertirlo exigiría un
   servidor: la página lo detecta y guía para copiar la dirección de la imagen.
-- **iCloud** no sirve: sus enlaces abren una página y las direcciones directas de sus fotos
-  caducan pronto. La página lo explica y sugiere subir el archivo o usar Google Drive o Fotos.
+- **Redes sociales:**
+  - Sirven X, Reddit, Pinterest, Bluesky, Tumblr, Fur Affinity, DeviantArt e Imgur. Con el
+    enlace de una publicación, la página muestra un botón para abrirla y dice qué dirección de
+    imagen copiar (p. ej. `https://pbs.twimg.com/…`). Las páginas de Imgur se convierten solas
+    y las imágenes de X se ajustan a tamaño mediano.
+  - No sirven Instagram, Facebook, Threads, Discord, TikTok, Telegram ni iCloud: abren
+    páginas y las direcciones de sus imágenes caducan (Discord, en unas 24 horas). La página
+    lo explica y sugiere subir el archivo.
 - Imágenes cuyo sitio no permite copiarlas (sin CORS, como Google Fotos o Drive): se ven en
   pantalla, al escanear y en el PDF; en el PNG van con el emblema en su lugar y se avisa.
 - Bytes (v3, binario): cabecera de 29 bytes (banderas, ID de crew en 30 bits, color RGB,
