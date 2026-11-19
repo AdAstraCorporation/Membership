@@ -280,3 +280,87 @@ fieldset { min-width: 0; }
   .muestras { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem .6rem; }
   .muestra i { aspect-ratio: 1.3; }
 }
+
+/* ---------- Ficha de rol (tercera cara) ---------- */
+.ficha-quien { text-align: center; padding: 14px 20px 8px; margin: 0 20px; border-bottom: 1px solid var(--linea); }
+.ficha-nombre { margin: 0; font-family: var(--serif); font-weight: 600; font-size: 1.45rem; letter-spacing: .06em; text-transform: uppercase; line-height: 1.1; }
+.ficha-nivel { margin: .25rem 0 0; font-size: .68rem; letter-spacing: .22em; text-transform: uppercase; color: var(--gris); }
+.ficha-rol { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 10px 20px 4px; font-size: .78rem; }
+.ficha-rol dt, .ficha-derivados dt { font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: .62rem; color: var(--gris); padding-top: .1rem; }
+.ficha-rol dd { margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.ficha-rol small { display: block; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--gris); font-size: .7rem; }
+.ficha-stats { display: flex; flex-direction: column; gap: 6px; padding: 8px 20px 4px; }
+.stat { display: grid; grid-template-columns: 84px 1fr 42px; align-items: center; gap: 8px; font-size: .72rem; }
+.stat-nombre { font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .62rem; }
+.stat-barra { display: flex; height: 9px; border-radius: 5px; background: var(--linea); overflow: hidden; }
+.stat-barra i { display: block; background: var(--crew); }
+.stat-barra b { display: block; background: repeating-linear-gradient(135deg, var(--crew) 0 2px, transparent 2px 4px); box-shadow: inset 1px 0 0 var(--papel); }
+.stat-valor { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat-valor em, .bonus { font-style: normal; font-weight: 600; font-size: .85em; color: var(--crew); margin-left: 2px; }
+.ficha-leyenda { display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin: 4px 20px 0; font-size: .58rem; letter-spacing: .12em; text-transform: uppercase; color: var(--gris); }
+.ficha-leyenda i, .ficha-leyenda b { display: inline-block; width: 14px; height: 7px; border-radius: 3px; background: var(--crew); }
+.ficha-leyenda b { margin-left: 8px; background: repeating-linear-gradient(135deg, var(--crew) 0 2px, transparent 2px 4px); border: 1px solid var(--crew); }
+.ficha-derivados { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 20px 0; padding-top: 10px; border-top: 1px solid var(--linea); text-align: center; }
+.ficha-derivados div { display: flex; flex-direction: column; gap: 2px; }
+.ficha-derivados dt { font-size: .55rem; padding: 0; }
+.ficha-derivados dd { margin: 0; font-family: var(--serif); font-size: 1.15rem; font-weight: 600; }
+.ficha-tirada { margin: 10px 20px 16px; text-align: center; font-size: .7rem; letter-spacing: .06em; color: var(--gris); line-height: 1.6; }
+.ficha-tirada strong { color: var(--tinta); font-size: .85rem; }
+.ficha-tirada .dados { font-size: 1.2rem; letter-spacing: .1em; color: var(--tinta); vertical-align: -2px; margin-right: 4px; }
+.ficha-avance { color: #a33b3b; font-weight: 600; }
+.ficha-vacia { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 30px 28px; text-align: center; color: var(--gris); }
+.ficha-vacia img { width: 72px; opacity: .45; }
+.ficha-vacia p { margin: 0; font-weight: 600; color: var(--tinta); font-size: .9rem; line-height: 1.5; }
+.ficha-vacia small { font-size: .74rem; line-height: 1.5; }
+.estilo-2 .ficha-avance { color: #d08a80; }
+.estilo-3 .stat-barra { height: 6px; }
+.estilo-4 .ficha-rol dd, .estilo-4 .ficha-nivel { font-family: var(--serif); }
+
+/* ---------- Estadísticas en el formulario ---------- */
+.aviso-stats { margin: 0; padding: .7rem .9rem; border-radius: 8px; border: 1px solid #c2ad8566; background: #c2ad851a; font-size: .85rem; line-height: 1.5; }
+.tirada { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; }
+.tirada-texto { flex: 1 1 160px; display: flex; flex-direction: column; gap: .2rem; }
+.tirada-total { margin: 0; font-weight: 600; }
+.dados-caja { display: flex; gap: .4rem; }
+.dado { width: 2.4rem; height: 2.4rem; display: grid; place-items: center; border-radius: 8px; background: #ecebe6; color: #16140f; font-weight: 700; font-size: 1.15rem; box-shadow: inset 0 -3px 0 #0003; }
+.dados-caja.rodando .dado { animation: rodar .21s linear infinite; }
+@keyframes rodar { 0% { transform: rotate(0) translateY(0); } 50% { transform: rotate(12deg) translateY(-3px); } 100% { transform: rotate(0) translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .dados-caja.rodando .dado { animation: none; } }
+.reparto { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem 1.2rem; }
+.reparto-fila { display: grid; grid-template-columns: 1fr auto 3.2rem auto; align-items: center; gap: .4rem; }
+.reparto-fila output { text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.boton.mini { padding: .25rem .65rem; min-width: 2.2rem; }
+.boton.mini:disabled, .boton:disabled.secundario { opacity: .4; cursor: not-allowed; }
+.boton.mini-texto { padding: .4rem .8rem; font-size: .85rem; }
+.reparto-pie { display: flex; justify-content: space-between; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.restantes { margin: 0; font-weight: 600; color: var(--acento); }
+.restantes.listo { color: #8a9a7b; }
+.derivados { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; margin: 0; }
+.derivados:empty { display: none; }
+.derivados div { display: flex; gap: .4rem; align-items: baseline; }
+.derivados dt { color: var(--tenue); font-size: .82rem; }
+.derivados dd { margin: 0; font-weight: 700; }
+.stats-resumen { display: grid; grid-template-columns: auto 1fr; gap: .3rem 1rem; margin: 0; font-size: .92rem; }
+.stats-resumen dt { color: var(--tenue); }
+.stats-resumen dd { margin: 0; font-weight: 600; }
+.boton.bloqueado { opacity: .5; }
+@media (max-width: 560px) { .reparto { grid-template-columns: 1fr; } }
+
+/* ---------- Actualización desde el Explorador ---------- */
+.tarjeta-ancha { width: min(560px, 100%); }
+.act-quien { font-family: var(--serif); font-size: 1.15rem; color: var(--acento); }
+.resumen-partida { margin: 0; padding: .7rem 1rem; border-left: 3px solid var(--acento); background: var(--fondo); border-radius: 0 8px 8px 0; line-height: 1.55; white-space: pre-line; }
+.comparar { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.comparar th, .comparar td { padding: .35rem .5rem; border-bottom: 1px solid var(--borde); text-align: left; }
+.comparar thead th { color: var(--tenue); font-weight: 500; font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; }
+.comparar tbody th { font-weight: 500; color: var(--tenue); }
+.comparar tr.cambia td:last-child { color: var(--acento); font-weight: 700; }
+.fila-enlace { display: flex; gap: .5rem; }
+.fila-enlace input { flex: 1; min-width: 0; }
+.aviso-ancho { max-width: 520px; word-break: normal; }
+.cred-ficha .ficha-stats { gap: 11px; padding-top: 14px; }
+.cred-ficha .ficha-derivados { margin-top: 18px; }
+.cred-ficha .ficha-tirada { margin-top: 16px; }
+.tarjeta-unirse a.boton { text-align: center; }
+/* Bonus del rasgo: color sólido atenuado (html2canvas no dibuja degradados repetidos en el PNG) */
+.stat-barra b, .ficha-leyenda b { background: var(--crew); opacity: .45; border: 0; box-shadow: none; }
