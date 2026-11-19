@@ -141,8 +141,7 @@
         <fieldset>
           <legend>Imágenes <span class="opcional">(opcionales)</span></legend>
           <div class="fila">
-            <label>Tu foto <input name="foto" type="file" accept="image/*"></label>
-            <label>o enlace <input name="fotoEnlace" type="url" maxlength="500" placeholder="https://…">
+            <label>Tu foto (enlace) <input name="fotoEnlace" type="url" maxlength="500" placeholder="https://…">
               <span class="precarga" id="precarga-fotoEnlace" hidden><img alt="" referrerpolicy="no-referrer"><small></small></span>
               <span class="ayuda-enlace" hidden>
                 <a class="boton secundario" target="_blank" rel="noopener noreferrer">Abrir el enlace</a>
@@ -150,18 +149,16 @@
               </span></label>
           </div>
           <div class="fila">
-            <label>Logo de la crew <input name="logo" type="file" accept="image/*"></label>
-            <label>o enlace <input name="logoEnlace" type="url" maxlength="500" placeholder="https://…">
+            <label>Logo de la crew (enlace) <input name="logoEnlace" type="url" maxlength="500" placeholder="https://…">
               <span class="precarga" id="precarga-logoEnlace" hidden><img alt="" referrerpolicy="no-referrer"><small></small></span>
               <span class="ayuda-enlace" hidden>
                 <a class="boton secundario" target="_blank" rel="noopener noreferrer">Abrir el enlace</a>
                 <small></small>
               </span></label>
           </div>
-          <small id="logo-heredado" class="ayuda" hidden>Ya viene el logo de tu crew. Si quieres otro, súbelo aquí.</small>
-          <p class="aviso-calidad">Ojo: si subes la imagen como archivo, el QR guarda una copia diminuta y quien
-            lo escanee la verá borrosa. Tu PNG y tu PDF sí la llevan completa. Para que se vea bien al
-            escanear, pega un enlace.</p>
+          <small id="logo-heredado" class="ayuda" hidden>Ya viene el logo de tu crew. Si quieres otro, pega su enlace.</small>
+          <p class="aviso-calidad">Las imágenes viajan en el QR solo como enlace (https://…): así el QR es más
+            pequeño y quien lo escanee las ve con buena calidad.</p>
           <div id="calidad-qr" class="calidad-qr" hidden></div>
           <small class="ayuda">Con un enlace, el QR guarda solo la dirección y la imagen se ve con su calidad
             original, GIF animados incluidos. Si la subes como archivo, un GIF queda quieto. Ten en cuenta

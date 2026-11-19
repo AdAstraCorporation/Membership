@@ -8,9 +8,8 @@ vista muestra el frente y la ficha de rol; las descargas incluyen además el rev
 
 ## Cómo funciona
 
-- **Calidad.** Una imagen subida como archivo viaja en el QR muy reducida y pierde mucha
-  calidad al escanear; la página lo avisa y muestra el tamaño real y cómo se verá. Con un
-  enlace se conserva la calidad original.
+- **Imágenes solo por enlace.** La foto y el logo se ponen como enlace `https`. El QR guarda solo
+  la dirección, así que es pequeño y quien lo escanee ve la imagen con su calidad original.
 - **Sin evasiones.** En pantalla nunca se muestran el reverso con el QR ni los IDs de la crew y
   del tripulante: se generan solo en el archivo descargado (PNG o PDF). Así, una captura de la
   vista previa o de una credencial escaneada no sirve como credencial. Al abrir una credencial
@@ -19,9 +18,8 @@ vista muestra el frente y la ficha de rol; las descargas incluyen además el rev
   Una credencial escaneada **no se puede descargar ni imprimir**: así nadie baja la credencial
   de otra persona. Solo se descarga desde el formulario, al que se llega con la contraseña de la
   crew (al fundarla, al unirse o al renovar).
-- **Todo va en el QR.** El QR del reverso contiene la credencial completa: datos, foto y
-  logo de la crew (estos dos como miniaturas WebP fijas de unos 100–160 px). Al escanearlo, la página
-  la reconstruye. El sitio no recibe nada: los datos van en el fragmento `#C…` del enlace,
+- **Todo va en el QR.** El QR del reverso contiene la credencial completa: los datos y los enlaces
+  de la foto y del logo de la crew, todo comprimido. Al escanearlo, la página la reconstruye. El sitio no recibe nada: los datos van en el fragmento `#C…` del enlace,
   que el navegador no envía al servidor.
 - **Entrada.** La página abre directamente el formulario para fundar una crew (sin QR es lo
   único posible); para unirse a una existente se escanea el QR de un miembro.
@@ -75,11 +73,11 @@ vista muestra el frente y la ficha de rol; las descargas incluyen además el rev
   - *La app:* busca una versión nueva y, si la hay, la aplica y recarga. El punto rojo del botón
     avisa cuando ya se descargó una. El workflow de Pages pone el commit en `sw.js` en cada
     publicación, y así se detecta la versión nueva.
-- **Imágenes por enlace.** En vez de subir la foto o el logo se puede poner un enlace `https`.
-  Entonces el QR guarda solo la dirección (unos pocos bytes en lugar de ~1,5 KB): mucho más
-  liviano y la imagen se ve en su calidad original, GIF incluidos. Depende de que el enlace siga
-  activo, y el sitio que la aloja verá quién abre la credencial. Si además se sube el archivo,
-  se usa solo para el PNG y el PDF. Quien se une hereda el enlace del logo de la crew.
+- **Imágenes por enlace.** La foto y el logo son siempre un enlace `https`: el QR guarda solo la
+  dirección y la imagen se ve en su calidad original, GIF incluidos. Depende de que el enlace siga
+  activo, y el sitio que la aloja verá quién abre la credencial. Quien se une hereda el enlace del
+  logo de la crew. Las credenciales antiguas con la imagen dentro del QR se siguen viendo; al
+  renovarlas, la página pide el enlace.
 - **Aislado.** La Content-Security-Policy de `index.html` bloquea en el navegador cualquier
   conexión fuera del sitio, salvo las imágenes `https` que el propio usuario enlaza (y wsrv.nl al descargar el PNG).
 
@@ -88,7 +86,7 @@ vista muestra el frente y la ficha de rol; las descargas incluyen además el rev
 - Enlace: `<página>#C<base43>`. Base43 usa solo caracteres del modo alfanumérico del QR
   (`0-9 A-Z $ * + - . / :`), más compacto que el texto normal. El QR tiene dos segmentos:
   la dirección (modo byte) y los datos (alfanumérico), con corrección de errores M o L.
-- Imagen por enlace: bloque de formato 4 con la dirección en UTF-8 (solo `https`, ≤500).
+- Imágenes: enlaces `https` (≤500 caracteres) dentro del bloque de texto.
 - Enlaces de Google: un archivo compartido de **Google Drive** se convierte solo a imagen
   directa (`lh3.googleusercontent.com/d/<id>`), y una imagen directa de **Google Fotos**
   (`lh3.googleusercontent.com/…`) se ajusta a 512 px (`=s512`). El enlace de *compartir* de
@@ -101,22 +99,22 @@ vista muestra el frente y la ficha de rol; las descargas incluyen además el rev
     y las imágenes de X se ajustan a tamaño mediano.
   - No sirven Instagram, Facebook, Threads, Discord, TikTok, Telegram ni iCloud: abren
     páginas y las direcciones de sus imágenes caducan (Discord, en unas 24 horas). La página
-    lo explica y sugiere subir el archivo.
+    lo explica y sugiere usar otro servicio.
 - Imágenes cuyo sitio no permite copiarlas (sin CORS, como Google, X y la mayoría de redes): el
   navegador no deja que la página lea sus píxeles, así que **solo al descargar el PNG** se piden a
   través de [wsrv.nl](https://wsrv.nl), un servicio público y gratuito de imágenes que sí lo
   permite (wsrv.nl ve la dirección de la imagen). En pantalla, al escanear y en el PDF se usa el
   enlace original. Si wsrv.nl no la obtiene, el PNG lleva el emblema y se avisa.
-- Bytes (v4, binario): cabecera de 31 bytes (banderas, ID de crew en 30 bits, color RGB,
-  emisión e ingreso en días desde 2020 (formato v4; las v3 se siguen leyendo), hash crudo de 16 bytes),
-  textos `nombre␟especie␟pronombres␟crew␟cargo[␟x]` (`␟` = `\x1f`) comprimidos solo si ahorra, y por
-  imagen `[tipo<<4|formato][largo][bytes]`. El sexto texto `x` (estadísticas) es opcional y no
-  cambia la versión: los lectores viejos lo ignoran.
-- Imágenes: presupuesto de ~1,4 KB entre las dos. Reescalado
-  de alta calidad y bisección de la calidad para aprovecharlo; sin canal alfa ni metadatos
-  (perfil de color, EXIF), que en miniaturas pesan más que la propia imagen.
-- El QR solo guarda imágenes fijas: un GIF subido como archivo se guarda con su primer cuadro.
-  Las animaciones se ven únicamente con un enlace.
+- Bytes (v5, binario):
+  - **Cabecera de 31 bytes:** banderas, ID de crew en 30 bits, color RGB, emisión e ingreso en días desde 2020 y hash crudo de 16 bytes.
+  - **Bloque de texto:** `nombre␟especie␟pronombres␟crew␟cargo␟x␟foto␟logo` (`␟` = `\x1f`, sin vacíos al final).
+- **Compresión.** Se prueban cuatro variantes y se guarda la más corta: tal cual, deflate, diccionario y diccionario + deflate.
+  - El diccionario cambia 30 fragmentos frecuentes por un byte (`0x01`-`0x1E`): `https://`, los dominios de imágenes más usados, las claves de `x`, «Corporación»…
+  - La bandera bit 3 marca deflate y el bit 15 del largo marca diccionario.
+  - En una credencial típica con dos enlaces ahorra un 33 %: el QR pasa de 206 a 138 caracteres.
+  - La Carta Estelar tiene una copia exacta del diccionario; no se puede cambiar su orden.
+- Versiones anteriores: v4 y v3 llevaban el texto sin diccionario y las imágenes en bloques
+  `[tipo<<4|formato][largo][bytes]` (WebP, JPEG o enlace). Se siguen leyendo.
 - Carga: html2canvas (~200 KB) solo se descarga al pedir el PNG, y jsQR (~130 KB) solo al
   leer un QR sin lector nativo del navegador (BarcodeDetector); qrcode va minificado.
 - Contraseña: PBKDF2-SHA256, 210 000 iteraciones. La sal incluye el ID de la crew, su estilo
@@ -182,11 +180,10 @@ reverso, para unirse a una partida.
 - Es un control social, no de seguridad: todo ocurre en el navegador y el hash de la
   contraseña va en cada QR. Alguien con conocimientos técnicos puede saltárselo, y una
   contraseña corta se puede adivinar por fuerza bruta. Usa frases largas.
-- Con foto y logo subidos como archivo el QR es denso (versión ~35); con enlaces es simple. Se lee bien desde la pantalla o impreso a
-  buen tamaño; muy pequeño puede costar.
+- Con enlaces y compresión el QR es simple. Se lee bien desde la pantalla o impreso a buen tamaño; muy pequeño puede costar.
 - El vencimiento usa el reloj del dispositivo que escanea.
 - Para el PNG, las imágenes enlazadas sin CORS dependen de wsrv.nl; si no responde, el PNG lleva
-  el emblema. El PDF siempre las incluye; subir el archivo también lo resuelve.
+  el emblema. El PDF siempre las incluye.
 
 ## Archivos
 

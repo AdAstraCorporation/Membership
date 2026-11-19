@@ -1,7 +1,7 @@
 // Generador de credenciales de la Corporación Ad Astra.
 // - Aislado: no llama a ningún servicio externo (lo refuerza la CSP de index.html).
-// - No almacena nada: el QR contiene TODA la credencial (datos, foto y logo de la crew,
-//   estos dos en miniatura), y al escanearlo esta página la reconstruye.
+// - No almacena nada: el QR contiene TODA la credencial (datos y enlaces de la foto y del logo
+//   de la crew), y al escanearlo esta página la reconstruye. Las imágenes solo viajan como enlace.
 // - Crews: cualquiera puede fundar una. Cada crew tiene un ID aleatorio (CR-XXXXXX) y una
 //   contraseña cuyo hash viaja en el QR; con ella se valida a quien quiere unirse.
 // - Las credenciales vencen al año de su emisión.
@@ -15,10 +15,15 @@
 //   [4] ID de crew (6 símbolos base32 = 30 bits)   [3] color RGB
 //   [2] emisión (días desde 2020-01-01)            [2] ingreso a la crew (días, se conserva al renovar)
 //   [16] hash de la contraseña
-//   [2] largo del texto + texto UTF-8 (nombre␟especie␟pronombres␟crew␟cargo[␟x]), deflate si ahorra
-//       x (opcional) = estadísticas de rol «R1;rol=…;ras=…;s=…;lv=…;xp=…;hp=…;mo=…;t=…». Los lectores
-//       viejos ignoran el sexto texto y las credenciales sin x se siguen leyendo.
-//   por imagen: [1] tipo<<4 | formato  [2] largo  [n] bytes   (tipo 1 foto, 2 logo; formato 1 WebP, 2 JPEG)
+//   [2] largo del texto (bit 15 = diccionario) + texto UTF-8:
+//       nombre␟especie␟pronombres␟crew␟cargo␟x␟enlace de la foto␟enlace del logo (sin vacíos al final)
+//       x (opcional) = estadísticas de rol «R1;rol=…;ras=…;s=…;lv=…;xp=…;hp=…;mo=…;t=…».
+//   Compresión del texto: se prueban 4 variantes y se guarda la más corta:
+//       tal cual · deflate · diccionario · diccionario + deflate  (bandera bit3 = deflate, bit 15 del largo = diccionario)
+//       El diccionario cambia fragmentos frecuentes (https://, dominios de imágenes, claves de x…) por un byte 0x01-0x1E.
+//       Ahorra un 35-45 % en una credencial típica (deflate solo: ~20 %).
+// Versiones anteriores (se siguen leyendo): v4 y v3 llevaban texto sin diccionario y, después, las imágenes:
+//   [1] tipo<<4 | formato  [2] largo  [n] bytes   (tipo 1 foto, 2 logo; formato 1 WebP, 2 JPEG, 4 enlace)
 
 const $ = (id) => document.getElementById(id);
 
@@ -40,10 +45,22 @@ const ESTILOS = {
 const estiloDe = (d) => (d.l === "1" && ESTILOS[d.y] ? d.y : d.s);
 const COLOR_POR_DEFECTO = "#b5a27c";
 
-// Presupuesto de bytes para las imágenes dentro del QR (más bytes = QR más denso).
-// El QR guarda solo imágenes fijas. Las animaciones (GIF) se ven únicamente con un enlace.
-const PRESUPUESTO_LOGO = 380;
-const PRESUPUESTO_IMAGENES = 1450;
+// Diccionario de compresión (v5). ¡No cambiar el orden! La Carta Estelar tiene una copia exacta.
+// Código = posición + 1 (0x01-0x1E); 0x1F es el separador.
+const DICCIONARIO = ["https://", "lh3.googleusercontent.com/", "drive.google.com/", "i.imgur.com/", "pbs.twimg.com/media/", "cdn.bsky.app/img/",
+  "i.pinimg.com/", "d.furaffinity.net/art/", ".media.tumblr.com/", "i.redd.it/", ".png", ".jpg", ".webp", "R1;rol=", ";ras=", ";s=",
+  ";lv=", ";xp=", ";hp=100;mo=", ";hp=", ";mo=", ";fa=", ";iv=", ";fv=", ";ms=", ";mi=", ";t=", "Corporación", "Tripulante", "Capitán"];
+const conDiccionario = (s) => {
+  let o = "";
+  for (let i = 0; i < s.length; ) {
+    let k = -1, largo = 0;
+    DICCIONARIO.forEach((e, j) => { if (e.length > largo && s.startsWith(e, i)) [k, largo] = [j, e.length]; });
+    if (k >= 0) (o += String.fromCharCode(k + 1)), (i += largo);
+    else o += s[i++];
+  }
+  return o;
+};
+const sinDiccionario = (s) => s.replace(/[\x01-\x1e]/g, (c) => DICCIONARIO[c.charCodeAt(0) - 1] ?? "");
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -105,9 +122,8 @@ const comprimir = (bytes) => transformar(bytes, new CompressionStream("deflate-r
 const descomprimir = (bytes) => transformar(bytes, new DecompressionStream("deflate-raw"));
 
 // ---------- Empaquetado binario ----------
-const VERSION = 4; // la 3 (sin fecha de ingreso) se sigue leyendo
+const VERSION = 5; // la 4 y la 3 (sin fecha de ingreso; con imágenes incrustadas) se siguen leyendo
 const FORMATOS = { 1: "image/webp", 2: "image/jpeg", 4: "enlace" }; // el 3 (GIF) ya no se usa: el QR solo lleva imágenes fijas
-const CODIGO_FORMATO = { "image/webp": 1, "image/jpeg": 2, enlace: 4 };
 
 // Imagen por enlace: el QR guarda solo la dirección (https, sin espacios ni comillas).
 const ENLACE_RE = /^https:\/\/[^\s"'<>\\]{3,500}$/i;
@@ -224,14 +240,20 @@ const unir = (partes) => {
   return out;
 };
 
+// Las imágenes solo viajan como enlace (fotoEnlace/logoEnlace: texto https://… o vacío).
 async function empaquetar(d, { foto, logo } = {}) {
-  // El sexto texto (x) solo va si hay estadísticas: así una credencial sin ellas pesa lo mismo que antes.
-  const textos = [d.n, d.e, d.p, d.c, d.r].map((t) => t ?? "");
-  if (d.x) textos.push(d.x);
-  const textoPlano = new TextEncoder().encode(textos.join(SEP));
-  const textoZ = await comprimir(textoPlano);
-  const comprimido = textoZ.length < textoPlano.length;
-  const texto = comprimido ? textoZ : textoPlano;
+  const textos = [d.n, d.e, d.p, d.c, d.r, d.x, foto, logo].map((t) => t ?? "");
+  while (textos.length > 5 && !textos[textos.length - 1]) textos.pop(); // sin vacíos al final
+  const plano = textos.join(SEP);
+  const enc = (s) => new TextEncoder().encode(s);
+  const variantes = [{ t: enc(plano), z: false, dic: false }];
+  variantes.push({ t: await comprimir(variantes[0].t), z: true, dic: false });
+  if (!/[\x01-\x1e]/.test(plano)) {
+    const dic = enc(conDiccionario(plano));
+    variantes.push({ t: dic, z: false, dic: true }, { t: await comprimir(dic), z: true, dic: true });
+  }
+  const mejor = variantes.reduce((a, b) => (b.t.length < a.t.length ? b : a));
+  const texto = mejor.t, comprimido = mejor.z;
   const hayY = d.l === "1" && ESTILOS[d.y];
   const banderas =
     (d.f === "1" ? 1 : 0) | (d.l === "1" ? 2 : 0) | (hayY ? 4 : 0) | (comprimido ? 8 : 0) |
@@ -243,17 +265,14 @@ async function empaquetar(d, { foto, logo } = {}) {
   const partes = [
     Uint8Array.of(VERSION, banderas, ...idABytes(d.i), ...rgb, dias >> 8, dias & 0xff, ingreso >> 8, ingreso & 0xff),
     hash,
-    Uint8Array.of(texto.length >> 8, texto.length & 0xff),
+    Uint8Array.of((texto.length >> 8) | (mejor.dic ? 0x80 : 0), texto.length & 0xff),
     texto,
   ];
-  for (const [tipo, img] of [[1, foto], [2, logo]]) {
-    if (!img) continue;
-    const n = img.bytes.length;
-    partes.push(Uint8Array.of((tipo << 4) | CODIGO_FORMATO[img.mime], n >> 8, n & 0xff), img.bytes);
-  }
   return aBase43(unir(partes));
 }
 
+const texto4 = (b, o) => String.fromCharCode(b[o], b[o + 1], b[o + 2], b[o + 3]);
+// Solo para leer credenciales v3/v4 con imágenes incrustadas.
 function firmaValida(mime, b) {
   if (mime === "image/webp") return b.length > 12 && texto4(b, 0) === "RIFF" && texto4(b, 8) === "WEBP";
   if (mime === "image/jpeg") return b[0] === 0xff && b[1] === 0xd8;
@@ -267,15 +286,18 @@ async function desempaquetar(texto) {
   // v3: versión(1) banderas(1) ID(4) color(3) emisión(2) = 11 · hash(16) · largo(2) = 29
   // v4: igual, con ingreso(2) después de la emisión = 13 · hash(16) · largo(2) = 31
   const v = b[0];
-  if (v !== 3 && v !== VERSION) throw new Error("versión desconocida");
+  if (v !== 3 && v !== 4 && v !== VERSION) throw new Error("versión desconocida");
   const cab = v === 3 ? 11 : 13;
   if (b.length < cab + 18) throw new Error("truncado");
   const banderas = b[1];
-  const largo = (b[cab + 16] << 8) | b[cab + 17];
+  const dic = v >= 5 && b[cab + 16] & 0x80;
+  const largo = ((b[cab + 16] & (v >= 5 ? 0x7f : 0xff)) << 8) | b[cab + 17];
   if (cab + 18 + largo > b.length) throw new Error("truncado");
   let t = b.slice(cab + 18, cab + 18 + largo);
   if (banderas & 8) t = await descomprimir(t);
-  const [n, e, p, c, r, x] = new TextDecoder().decode(t).split(SEP);
+  let plano = new TextDecoder().decode(t);
+  if (dic) plano = sinDiccionario(plano);
+  const [n, e, p, c, r, x, fotoEnl, logoEnl] = plano.split(SEP);
   const hash = b.slice(cab, cab + 16);
   const crudo = {
     n, e, p, c, r, x,
@@ -291,8 +313,12 @@ async function desempaquetar(texto) {
   };
   const d = limpiar(crudo);
   const imgs = {};
+  // v5: las imágenes son enlaces dentro del texto
+  if (fotoEnl && enlaceValido(fotoEnl)) imgs.foto = imagenEnlace(fotoEnl);
+  if (logoEnl && enlaceValido(logoEnl)) imgs.logo = imagenEnlace(logoEnl);
+  // v3/v4: bloques de imagen después del texto (incrustadas o enlace)
   let o = cab + 18 + largo;
-  while (o + 3 <= b.length) {
+  while (v < 5 && o + 3 <= b.length) {
     const tipo = b[o] >> 4;
     const mime = FORMATOS[b[o] & 15];
     const len = (b[o + 1] << 8) | b[o + 2];
@@ -541,100 +567,6 @@ function fichaRol(d, st, { avance = "" } = {}) {
 }
 
 const base = () => `${location.origin}${location.pathname}#C`;
-
-// ---------- Imágenes en miniatura para el QR ----------
-// Los navegadores añaden metadatos (perfil de color ICC, EXIF) de varios cientos de bytes,
-// que en una miniatura pesan más que la propia imagen. Se quitan.
-const texto4 = (b, o) => String.fromCharCode(b[o], b[o + 1], b[o + 2], b[o + 3]);
-function webpMinimo(b) {
-  if (texto4(b, 12) !== "VP8X") return b; // ya es un WebP simple
-  let o = 12;
-  while (o + 8 <= b.length) {
-    const tipo = texto4(b, o);
-    const n = b[o + 4] | (b[o + 5] << 8) | (b[o + 6] << 16) | (b[o + 7] << 24);
-    if (tipo === "VP8 " || tipo === "VP8L") {
-      const trozo = b.slice(o, o + 8 + n + (n & 1));
-      const total = 4 + trozo.length;
-      return unir([Uint8Array.of(82, 73, 70, 70, total & 255, (total >> 8) & 255, (total >> 16) & 255, (total >>> 24) & 255, 87, 69, 66, 80), trozo]);
-    }
-    o += 8 + n + (n & 1);
-  }
-  return b;
-}
-function jpegMinimo(b) {
-  const partes = [b.slice(0, 2)];
-  let o = 2;
-  while (o + 4 <= b.length && b[o] === 0xff && b[o + 1] !== 0xda) {
-    const n = (b[o + 2] << 8) | b[o + 3];
-    if (!(b[o + 1] >= 0xe1 && b[o + 1] <= 0xef)) partes.push(b.slice(o, o + 2 + n)); // fuera APP1–APP15
-    o += 2 + n;
-  }
-  partes.push(b.slice(o));
-  return unir(partes);
-}
-
-// Recorta (cuadrado si se pide) y reduce con el reescalado de alta calidad del navegador.
-async function escalar(base, lado, cuadrado) {
-  let [sx, sy, sw, sh] = [0, 0, base.width, base.height];
-  let w, h;
-  if (cuadrado) {
-    const s = Math.min(sw, sh);
-    [sx, sy, sw, sh] = [Math.floor((sw - s) / 2), Math.floor((sh - s) / 2), s, s];
-    w = h = lado;
-  } else {
-    const k = lado / Math.max(sw, sh);
-    w = Math.max(1, Math.round(sw * k));
-    h = Math.max(1, Math.round(sh * k));
-  }
-  try {
-    return await createImageBitmap(base, sx, sy, sw, sh, { resizeWidth: w, resizeHeight: h, resizeQuality: "high" });
-  } catch {
-    const cv = new OffscreenCanvas(w, h);
-    const g = cv.getContext("2d");
-    g.imageSmoothingQuality = "high";
-    g.drawImage(base, sx, sy, sw, sh, 0, 0, w, h);
-    return cv.transferToImageBitmap();
-  }
-}
-
-// Miniatura opaca sobre el color del papel (sin canal alfa, que pesa mucho) y sin metadatos.
-async function comprimirImagen(bmp, calidad) {
-  const cv = document.createElement("canvas");
-  cv.width = bmp.width;
-  cv.height = bmp.height;
-  const g = cv.getContext("2d", { alpha: false });
-  g.fillStyle = "#ecebe6";
-  g.fillRect(0, 0, cv.width, cv.height);
-  g.drawImage(bmp, 0, 0);
-  let blob = await new Promise((r) => cv.toBlob(r, "image/webp", calidad));
-  if (!blob || blob.type !== "image/webp") blob = await new Promise((r) => cv.toBlob(r, "image/jpeg", calidad)); // p. ej. Safari
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  return { mime: blob.type, bytes: blob.type === "image/webp" ? webpMinimo(bytes) : jpegMinimo(bytes) };
-}
-
-// Para cada tamaño (de mayor a menor) busca por bisección la calidad más alta que cabe en el
-// presupuesto. Se queda con el tamaño más grande que logra una calidad aceptable.
-const CALIDAD_ACEPTABLE = 0.35;
-async function miniatura(fuente, presupuesto, { cuadrado }) {
-  // Un GIF se guarda como imagen fija (su primer cuadro).
-  const base = await createImageBitmap(fuente);
-  let respaldo = null;
-  for (const lado of [160, 144, 128, 112, 96, 80, 64, 48, 32]) {
-    const bmp = await escalar(base, lado, cuadrado);
-    let [bajo, alto] = [0.05, 0.92];
-    let mejor = await comprimirImagen(bmp, bajo);
-    if (mejor.bytes.length > presupuesto) continue;
-    for (let paso = 0; paso < 6; paso++) {
-      const medio = (bajo + alto) / 2;
-      const r = await comprimirImagen(bmp, medio);
-      if (r.bytes.length <= presupuesto) [mejor, bajo] = [r, medio];
-      else alto = medio;
-    }
-    if (bajo >= CALIDAD_ACEPTABLE) return mejor;
-    respaldo ??= mejor; // cabe, pero con calidad baja: se usa solo si ningún tamaño lo hace mejor
-  }
-  return respaldo;
-}
 
 // Imagen recibida en un QR → Blob (si venía embebida) o { enlace } (si venía como enlace).
 const fuenteDe = (img) => (!img ? null : img.mime === "enlace" ? { enlace: img.enlace } : new Blob([img.bytes], { type: img.mime }));
@@ -1340,65 +1272,22 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false, xFijo = nu
   pintarMuestras($("muestras-miembro"), "y", previo?.d.y && libre ? previo.d.y : crew.s);
   mostrar("crear");
 
-  // Fuentes de imagen (archivo local o miniatura heredada) y sus miniaturas para el QR.
-  // Si hay enlace, el QR lleva el enlace; el archivo (si lo hay) solo se usa en el PNG y el PDF.
-  const archivoInicial = (x) => (x instanceof Blob ? x : null);
-  let fotoFuente = archivoInicial(previo?.foto);
-  let logoFuente = archivoInicial(logoHeredado);
-  let fotoUrl = fotoFuente && URL.createObjectURL(fotoFuente);
-  let logoUrl = logoFuente && URL.createObjectURL(logoFuente);
+  // Imágenes: solo enlaces. Una imagen incrustada de una credencial antigua no se copia a la nueva;
+  // se avisa para que se pegue su enlace.
   const enlace = (campo) => {
     const v = normalizarEnlace(campo.value);
     return enlaceValido(v) && !revisarEnlace(v) ? v : "";
   };
-  let miniFoto = null;
-  let miniLogo = null;
-
-  // Si el usuario cambia otra imagen mientras se calcula, solo vale el cálculo más reciente.
-  let versionMini = 0;
-  async function prepararMiniaturas() {
-    const mia = ++versionMini;
-    try {
-      // Las imágenes con enlace no se embeben: no gastan presupuesto.
-      const fotoEmbebida = enlace(form.fotoEnlace) ? null : fotoFuente;
-      const logoEmbebido = enlace(form.logoEnlace) ? null : logoFuente;
-      const logoNuevo = logoEmbebido ? await miniatura(logoEmbebido, PRESUPUESTO_LOGO, { cuadrado: false }) : null;
-      const resto = PRESUPUESTO_IMAGENES - (logoNuevo?.bytes.length ?? 0);
-      const fotoNueva = fotoEmbebida ? await miniatura(fotoEmbebida, resto, { cuadrado: true }) : null;
-      if (mia !== versionMini) return false;
-      [miniLogo, miniFoto] = [logoNuevo, fotoNueva];
-      await mostrarCalidadQr({ foto: fotoNueva, logo: logoNuevo });
-      estado("");
-      return true;
-    } catch {
-      if (mia === versionMini) estado("No pude abrir una de las imágenes. Prueba con otra.", true);
-      return false;
-    }
-  }
-
-  const cambiar = (input, tipo) => async () => {
-    const f = input.files[0] ?? null;
-    if (tipo === "foto") {
-      if (fotoUrl) URL.revokeObjectURL(fotoUrl);
-      fotoFuente = f;
-      fotoUrl = f && URL.createObjectURL(f);
-    } else {
-      if (logoUrl) URL.revokeObjectURL(logoUrl);
-      logoFuente = f ?? archivoInicial(logoHeredado);
-      logoUrl = logoFuente && URL.createObjectURL(logoFuente);
-    }
-    estado("Ajustando las imágenes para el QR…");
-    if (await prepararMiniaturas()) pintar();
-  };
-  form.foto.onchange = cambiar(form.foto, "foto");
-  form.logo.onchange = cambiar(form.logo, "logo");
+  const viejas = [previo?.foto instanceof Blob && "tu foto", logoHeredado instanceof Blob && "el logo de la crew"].filter(Boolean);
+  $("calidad-qr").hidden = !viejas.length;
+  $("calidad-qr").textContent = viejas.length ? `Tu credencial anterior llevaba ${viejas.join(" y ")} dentro del QR. Ahora las imágenes solo viajan como enlace: pégalo arriba para conservarla${viejas.length > 1 ? "s" : ""}.` : "";
   // Al escribir o pegar un enlace, la imagen se precarga al momento: miniatura y estado junto al
   // campo, y la credencial se actualiza sin esperar a salir del campo.
   for (const campo of [form.fotoEnlace, form.logoEnlace]) {
     let espera;
     const actualizar = async () => {
       await precargarEnlace(campo);
-      if (await prepararMiniaturas()) pintar();
+      pintar();
     };
     campo.oninput = () => {
       clearTimeout(espera);
@@ -1409,28 +1298,6 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false, xFijo = nu
       actualizar();
     };
     if (campo.value) precargarEnlace(campo); // enlace heredado o de la renovación
-  }
-
-  // Muestra cómo quedan dentro del QR las imágenes subidas como archivo (tamaño real y vista).
-  async function mostrarCalidadQr(minis) {
-    const caja = $("calidad-qr");
-    const partes = [];
-    for (const [img, nombre] of [[minis.foto, "Tu foto"], [minis.logo, "Logo de la crew"]]) {
-      if (!img) continue;
-      const blob = new Blob([img.bytes], { type: img.mime });
-      let tam = "";
-      try {
-        const bmp = await createImageBitmap(blob);
-        tam = `${bmp.width}×${bmp.height} px`;
-        bmp.close();
-      } catch {
-        /* sin tamaño */
-      }
-      partes.push(`<figure><img src="${URL.createObjectURL(blob)}" alt="">
-        <figcaption>${nombre} al escanear: ${tam}</figcaption></figure>`);
-    }
-    caja.hidden = !partes.length;
-    caja.innerHTML = partes.join("");
   }
 
   let turno = 0;
@@ -1450,10 +1317,7 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false, xFijo = nu
       d = limpiar({ ...crudo, n: "Tu nombre" });
     }
     const [fotoEnlace, logoEnlace] = [enlace(form.fotoEnlace), enlace(form.logoEnlace)];
-    const datos = await empaquetar(d, {
-      foto: fotoEnlace ? imagenEnlace(fotoEnlace) : miniFoto,
-      logo: logoEnlace ? imagenEnlace(logoEnlace) : miniLogo,
-    });
+    const datos = await empaquetar(d, { foto: fotoEnlace, logo: logoEnlace });
     if (mio !== turno) return; // llegó una edición más reciente
     // Sin estadísticas completas no se puede emitir: no hay QR ni descarga.
     credencialActual = statsPendiente ? null : { d, datos };
@@ -1462,9 +1326,8 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false, xFijo = nu
     else if ($("estado").textContent === estadoPrevio) estado("");
     estadoPrevio = statsPendiente;
     nombreArchivo = `credencial-${slug(d.n)}`;
-    if (!generarQr(base(), datos)) estado("No cabe todo en el QR. Prueba con una imagen más sencilla o usa un enlace.", true);
-    // Vista: el archivo local si lo hay (mejor calidad); si no, el enlace.
-    $("vista-crear").innerHTML = await credencial(d, { foto: fotoUrl || fotoEnlace, logo: logoUrl || logoEnlace }, { ficha, avance: statsPendiente });
+    if (!generarQr(base(), datos)) estado("No cabe todo en el QR. Prueba con enlaces más cortos.", true);
+    $("vista-crear").innerHTML = await credencial(d, { foto: fotoEnlace, logo: logoEnlace }, { ficha, avance: statsPendiente });
     respaldoImagenes($("vista-crear"));
   }
 
@@ -1473,7 +1336,6 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false, xFijo = nu
     clearTimeout(espera);
     espera = setTimeout(pintar, 150);
   };
-  await prepararMiniaturas();
   pintar();
 }
 
