@@ -288,6 +288,7 @@ fieldset { min-width: 0; }
 .ficha-rol { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 10px 20px 4px; font-size: .78rem; }
 .ficha-rol dt, .ficha-derivados dt { font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: .62rem; color: var(--gris); padding-top: .1rem; }
 .ficha-rol dd { margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.ficha-extra dd { text-transform: none; letter-spacing: 0; font-weight: 500; }
 .ficha-rol small { display: block; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--gris); font-size: .7rem; }
 .ficha-stats { display: flex; flex-direction: column; gap: 6px; padding: 8px 20px 4px; }
 .stat { display: grid; grid-template-columns: 84px 1fr 42px; align-items: center; gap: 8px; font-size: .72rem; }

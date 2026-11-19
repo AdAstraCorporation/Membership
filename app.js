@@ -335,8 +335,12 @@ function limpiar(o) {
 // Sexto texto de la credencial (x), máx. 160 caracteres:
 //   R1;rol=<código>;ras=<Rasgo>;s=<pil>,<ing>,<cie>,<med>,<seg>,<soc>;lv=<nivel>;xp=<xp>;hp=<0-100>;mo=<0-100>;t=<semilla>.<nº>.<total>
 //   Ejemplo: R1;rol=cie;ras=Curioso;s=3,4,9,5,3,4;lv=1;xp=0;hp=100;mo=75;t=8F3A1C2B.1.21
-// Opcionales, añadidos por la Carta Estelar al cerrar una misión (van antes de t):
+// Opcionales, añadidos por la Carta Estelar al cerrar una misión (en este orden, antes de t):
+//   fa=<facciones separadas por punto: aa.lc>;iv=<equipo: k,aai,cvc2>
 //   fv=<días de vuelo acumulados>;ms=<misiones completadas>;mi=<código HEX8 de la última misión aplicada>
+// iv: hasta 6 objetos; cada uno es [facción de 2 letras] + letra del objeto + [cantidad 2-9].
+//   Objetos de facción (llevan facción): i insignia, u uniformes, s salvoconducto, r reliquia, t tecnología, c contrabando.
+//   Equipo sin dueño (sin facción): b botiquín, h herramientas, a arma, d traductor, n sensor, k casco.
 // s guarda los valores repartidos SIN el bonus del rasgo (este se suma al mostrar).
 // Al crear: base 3, mín. 1, máx. 10. Al leer se aceptan 1-12 (mejoras ganadas en partida).
 const STATS = [
@@ -359,6 +363,33 @@ const RASGOS = {
   Insomne: { desc: "Más riesgo en hibernación", bonus: {} },
   Veterano: { desc: "+1 Pilotaje, Seguridad e Ingeniería", bonus: { pil: 1, seg: 1, ing: 1 } },
 };
+const FACCIONES = {
+  aa: ["✦", "Corporación Ad Astra"],
+  lc: ["⚖", "Liga de Comerciantes Libres"],
+  mh: ["⛨", "Manada de Hierro"],
+  ce: ["☾", "Círculo de la Estrella Oscura"],
+  cv: ["☠", "Corsarios del Vacío"],
+  ca: ["⌬", "Custodios del Archivo"],
+};
+const OBJ_FACCION = { i: "Insignia", u: "Uniformes", s: "Salvoconducto", r: "Reliquia", t: "Tecnología", c: "Contrabando" };
+const OBJ_EQUIPO = { b: "Botiquín de campaña", h: "Caja de herramientas", a: "Arma de mano", d: "Traductor universal", n: "Sensor portátil", k: "Casco de vuelo" };
+// "aa.lc" → ["aa","lc"] (sin repetidos ni códigos desconocidos)
+const leerFa = (v) => [...new Set(String(v ?? "").split(".").filter((f) => Object.hasOwn(FACCIONES, f)))].slice(0, 6);
+// "k,aai,cvc2" → [{f:null,o:"k",n:1},{f:"aa",o:"i",n:1},{f:"cv",o:"c",n:2}]
+function leerIv(v) {
+  const out = [];
+  for (const p of String(v ?? "").split(",").slice(0, 6)) {
+    const m = /^(aa|lc|mh|ce|cv|ca)?([a-z])([2-9])?$/.exec(p.trim());
+    if (!m || (m[1] ? !OBJ_FACCION[m[2]] : !OBJ_EQUIPO[m[2]])) continue;
+    out.push({ f: m[1] ?? null, o: m[2], n: +(m[3] ?? 1) });
+  }
+  return out;
+}
+const escribirIv = (iv) => iv.map((x) => `${x.f ?? ""}${x.o}${x.n > 1 ? x.n : ""}`).join(",");
+const nombreObj = (x) => (x.f ? `${OBJ_FACCION[x.o]} (${FACCIONES[x.f][1]})` : OBJ_EQUIPO[x.o]) + (x.n > 1 ? ` ×${x.n}` : "");
+const textoFa = (fa) => (fa.length ? fa.map((f) => `${FACCIONES[f][0]} ${FACCIONES[f][1]}`).join(" · ") : "ninguna");
+const textoIv = (iv) => (iv.length ? iv.map(nombreObj).join(", ") : "nada");
+
 const STAT_BASE = 3;
 const STAT_MIN = 1;
 const STAT_MAX_CREAR = 10;
@@ -405,6 +436,8 @@ function leerX(x) {
     t: null,
   };
   st.mo = entero(kv.mo, 0, 100) ?? Math.min(100, moralBase(st));
+  st.fa = leerFa(kv.fa);
+  st.iv = leerIv(kv.iv);
   st.fv = entero(kv.fv, 0, 9999999) ?? 0;
   st.ms = entero(kv.ms, 0, 99999) ?? 0;
   st.mi = /^[0-9A-F]{8}$/.test(kv.mi ?? "") ? kv.mi : null;
@@ -416,7 +449,8 @@ function leerX(x) {
 // Objeto → texto x (orden y formato exactos del contrato).
 function escribirX(st) {
   const t = st.t ? `;t=${st.t.sem}.${st.t.n}.${st.t.total}` : "";
-  const v = (st.fv ? `;fv=${st.fv}` : "") + (st.ms ? `;ms=${st.ms}` : "") + (st.mi ? `;mi=${st.mi}` : "");
+  const f = (st.fa?.length ? `;fa=${st.fa.join(".")}` : "") + (st.iv?.length ? `;iv=${escribirIv(st.iv)}` : "");
+  const v = f + (st.fv ? `;fv=${st.fv}` : "") + (st.ms ? `;ms=${st.ms}` : "") + (st.mi ? `;mi=${st.mi}` : "");
   return `R1;rol=${st.rol};ras=${st.ras};s=${STATS.map(([k]) => st.s[k]).join(",")};lv=${st.lv};xp=${st.xp};hp=${st.hp};mo=${st.mo}${v}${t}`;
 }
 
@@ -493,6 +527,7 @@ function fichaRol(d, st, { avance = "" } = {}) {
         <dt>Rasgo</dt><dd>${esc(st.ras || "—")}${rasgo ? ` <small>${esc(rasgo.desc)}</small>` : ""}</dd>
       </dl>
       <div class="ficha-stats">${filas}</div>
+      ${st.fa?.length || st.iv?.length ? `<dl class="ficha-rol ficha-extra">${st.fa?.length ? `<dt>Facciones</dt><dd>${esc(textoFa(st.fa))}</dd>` : ""}${st.iv?.length ? `<dt>Equipo</dt><dd>${esc(textoIv(st.iv))}</dd>` : ""}</dl>` : ""}
       <p class="ficha-leyenda"><i></i> base <b></b> bonus del rasgo</p>
       <dl class="ficha-derivados">
         <div><dt>Salud máx.</dt><dd>${saludMax(st)}</dd></div>
@@ -1605,6 +1640,8 @@ function tablaComparativa(antes, nueva) {
     ["XP", (st) => st.xp],
     ["Tiempo de vuelo", (st) => vuelo(st.fv)],
     ["Misiones", (st) => st.ms],
+    ["Facciones", (st) => esc(textoFa(st.fa ?? []))],
+    ["Equipo", (st) => esc(textoIv(st.iv ?? []))],
     ["Salud", (st) => `${st.hp}% de ${saludMax(st)}`],
     ["Moral", (st) => st.mo],
   ];

@@ -222,3 +222,12 @@ Formato (`#X` versión 2, deflate-raw + base43 de un JSON UTF-8):
 El campo `x` de cada personaje ya trae los valores finales y añade, antes de `t`, `fv=<días de vuelo acumulados>`,
 `ms=<misiones completadas>` y `mi=<código de la última misión>`. Una misión no se aplica dos veces a la misma credencial
 (se compara `mi`). La versión 1 (un personaje por enlace) se sigue aceptando.
+
+También puede traer, justo después de `mo`, las **facciones** y el **equipo** que el personaje llevaba encima al acabar:
+
+- `fa=aa.lc` lista las facciones separadas por punto: `aa` Corporación Ad Astra, `lc` Liga de Comerciantes Libres, `mh` Manada de Hierro, `ce` Círculo de la Estrella Oscura, `cv` Corsarios del Vacío y `ca` Custodios del Archivo.
+- `iv=k,aai,cvc2` lista hasta 6 objetos. Cada uno lleva el código de su facción si lo tiene, una letra y la cantidad cuando es de 2 a 9.
+  - Objetos de facción: `i` insignia, `u` uniformes, `s` salvoconducto, `r` reliquia, `t` tecnología, `c` contrabando.
+  - Equipo sin dueño: `b` botiquín, `h` herramientas, `a` arma, `d` traductor, `n` sensor, `k` casco.
+
+La ficha los muestra y los conserva. Al subir la credencial a otra partida, el personaje entra con su equipo y su afiliación, y eso influye en si otras facciones lo reconocen. Si no cabe todo en los 160 caracteres de `x`, la Carta recorta el equipo.
