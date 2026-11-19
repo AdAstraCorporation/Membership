@@ -8,12 +8,24 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none'">
   <title>Credencial · Corporación Ad Astra</title>
   <link rel="icon" href="favicon.png" type="image/png">
+  <!-- Webapp instalable (funciona sin conexión gracias a sw.js) -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f1115">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ad Astra">
   <link rel="stylesheet" href="style.css">
   <link rel="preload" href="logo.png" as="image">
 </head>
 <body>
   <header class="cabecera">
     <a class="marca" href="./"><img class="logo" src="logo.png" alt=""> Corporación Ad Astra</a>
+    <nav class="cabecera-acciones">
+      <button type="button" id="boton-instalar" class="boton secundario chico" hidden>Instalar app</button>
+      <button type="button" id="boton-actualizar" class="boton chico">Actualizar<span class="punto-nuevo" hidden></span></button>
+    </nav>
   </header>
 
 
@@ -86,7 +98,7 @@
           <label>Especie <input name="e" required maxlength="40"></label>
           <label><span>Pronombres <span class="opcional">(opcional)</span></span> <input name="p" maxlength="20"></label>
         </div>
-        <label>Rol <input name="r" maxlength="30" list="roles" placeholder="Tripulante"></label>
+        <label>Cargo en la crew <input name="r" maxlength="30" list="roles" placeholder="Tripulante"></label>
         <fieldset id="estilo-miembro" hidden>
           <legend>Estilo de tu credencial</legend>
           <div id="muestras-miembro" class="muestras"></div>
@@ -96,6 +108,35 @@
           <option value="Capitán"></option><option value="Piloto"></option><option value="Ingeniería"></option>
           <option value="Exploración"></option><option value="Médico"></option><option value="Navegación"></option>
         </datalist>
+
+        <!-- Estadísticas de rol: tirada 10 + 3d6, reparto, rol y rasgo (contrato R1 con el Explorador estelar) -->
+        <fieldset id="stats" class="stats">
+          <legend>Estadísticas de rol</legend>
+          <p id="stats-aviso" class="aviso-stats" hidden></p>
+          <div id="stats-editable" class="grupo-campos">
+            <div class="tirada">
+              <div id="dados" class="dados-caja" aria-live="polite"></div>
+              <div class="tirada-texto">
+                <p id="tirada-total" class="tirada-total"></p>
+                <small id="tirada-info" class="ayuda"></small>
+              </div>
+              <button type="button" id="boton-tirar" class="boton">Tirar</button>
+            </div>
+            <div id="reparto" class="reparto"></div>
+            <div class="reparto-pie">
+              <p id="restantes" class="restantes" aria-live="polite"></p>
+              <button type="button" id="reiniciar-reparto" class="boton secundario mini-texto">Reiniciar reparto</button>
+            </div>
+            <small class="ayuda">Cada estadística empieza en 3. Mínimo 1 y máximo 10. Para emitir la credencial hay que repartir todos los puntos.</small>
+            <div class="fila">
+              <label>Rol de tripulante <select name="rolJuego"></select></label>
+              <label>Rasgo <select name="rasgo"></select></label>
+            </div>
+            <small id="rasgo-desc" class="ayuda"></small>
+          </div>
+          <div id="stats-fijo" hidden></div>
+          <dl id="derivados" class="derivados"></dl>
+        </fieldset>
 
         <fieldset>
           <legend>Imágenes <span class="opcional">(opcionales)</span></legend>
@@ -149,8 +190,36 @@
     <div class="acciones">
       <button id="boton-unirse" class="boton" hidden>Unirme a esta tripulación</button>
       <button id="boton-renovar" class="boton secundario" hidden>Renovar</button>
+      <button id="boton-explorador" class="boton secundario" hidden>Llevar al Explorador</button>
     </div>
     <p id="ver-aviso" class="aviso"></p>
+    <p id="ver-estado" class="estado aviso-ancho" role="status"></p>
+  </main>
+
+  <!-- Actualización de personaje desde una partida del Explorador estelar (#X…) -->
+  <main id="actualizar" class="ver" hidden>
+    <div class="tarjeta-unirse tarjeta-ancha">
+      <p class="eyebrow">Explorador estelar</p>
+      <h2 id="act-titulo">Actualización de personaje desde una partida</h2>
+      <p id="act-quien" class="act-quien"></p>
+      <blockquote id="act-resumen" class="resumen-partida"></blockquote>
+      <div id="act-tabla"></div>
+      <p class="ayuda">Para aplicarla, escanea o sube el QR de la credencial actual de este personaje (el PNG del
+        reverso o una captura), o pega su enlace. Después se pide la contraseña de la crew, como al renovar.</p>
+      <div class="opciones-qr">
+        <button type="button" id="act-camara" class="boton secundario">Usar la cámara</button>
+        <label class="boton secundario">Subir imagen del QR
+          <input id="act-archivo" type="file" accept="image/*" hidden></label>
+      </div>
+      <div class="fila-enlace">
+        <input id="act-enlace" type="text" placeholder="o pega el enlace de la credencial (…#C…)" aria-label="Enlace de la credencial" autocomplete="off">
+        <button type="button" id="act-usar-enlace" class="boton secundario">Usar</button>
+      </div>
+      <video id="act-video" class="qr-video" playsinline muted hidden></video>
+      <p id="act-estado" class="estado" role="status"></p>
+      <button type="button" id="act-continuar" class="boton" hidden>Continuar con la contraseña</button>
+      <a class="boton secundario" href="./">Cancelar</a>
+    </div>
   </main>
 
   <main id="error" class="ver" hidden>
@@ -162,16 +231,52 @@
     <h2>¿Cómo quieres el PNG?</h2>
     <div class="opciones-png">
       <button type="button" class="opcion-png" data-formato="separadas">
-        <span class="mini-caras separadas" aria-hidden="true"><i></i><i></i></span>
-        <strong>Por separado</strong><small>Dos archivos: el frente y el reverso</small>
+        <span class="mini-caras separadas" aria-hidden="true"><i></i><i></i><i></i></span>
+        <strong>Por separado</strong><small>Un archivo por cara: frente, ficha de rol y reverso</small>
       </button>
       <button type="button" class="opcion-png" data-formato="juntas">
-        <span class="mini-caras juntas" aria-hidden="true"><i></i><i></i></span>
-        <strong>Juntas</strong><small>Una sola imagen con las dos caras</small>
+        <span class="mini-caras juntas" aria-hidden="true"><i></i><i></i><i></i></span>
+        <strong>Juntas</strong><small>Una sola imagen con todas las caras</small>
       </button>
     </div>
     <small class="ayuda">Si eliges por separado y el navegador pregunta, acepta descargar varios archivos.</small>
     <button type="button" class="boton secundario" data-formato="cancelar">Cancelar</button>
+  </dialog>
+
+  <!-- Actualizar: aplicar la partida del Explorador y buscar versión nueva de la app -->
+  <dialog id="dialogo-actualizar" class="dialogo">
+    <h2>Actualizar</h2>
+    <section class="dialogo-seccion">
+      <h3>Después de una partida</h3>
+      <p class="ayuda">Al terminar una misión, la Carta Estelar muestra un QR general para toda la tripulación.
+        Escanéalo (o sube su imagen) y luego tu credencial: se renueva con tus estadísticas, tiempo de vuelo y misiones.</p>
+      <div class="opciones-qr">
+        <button type="button" id="upd-camara" class="boton">Escanear QR de la misión</button>
+        <label class="boton secundario">Subir imagen del QR
+          <input id="upd-archivo" type="file" accept="image/*" hidden></label>
+      </div>
+      <video id="upd-video" class="qr-video" playsinline muted hidden></video>
+      <div class="fila-enlace">
+        <input id="upd-enlace" type="text" placeholder="Enlace de la partida (…#X…)" aria-label="Enlace de la partida" autocomplete="off">
+        <button type="button" id="upd-pegar" class="boton secundario">Pegar</button>
+      </div>
+      <button type="button" id="upd-aplicar" class="boton">Aplicar la partida</button>
+      <p id="upd-estado" class="estado" role="status"></p>
+    </section>
+    <section class="dialogo-seccion">
+      <h3>La app</h3>
+      <p id="upd-version" class="ayuda"></p>
+      <button type="button" id="upd-buscar" class="boton secundario">Buscar versión nueva</button>
+      <p id="upd-app-estado" class="estado" role="status"></p>
+    </section>
+    <button type="button" id="upd-cerrar" class="boton secundario">Cerrar</button>
+  </dialog>
+
+  <!-- Instalar en iPhone/iPad o en navegadores sin instalación automática -->
+  <dialog id="dialogo-instalar" class="dialogo">
+    <h2>Instalar la app</h2>
+    <p id="instalar-pasos" class="ayuda"></p>
+    <button type="button" id="instalar-cerrar" class="boton secundario">Entendido</button>
   </dialog>
 
   <script src="vendor/qrcode.min.js" defer></script>

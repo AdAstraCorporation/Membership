@@ -15,7 +15,9 @@
 //   [4] ID de crew (6 símbolos base32 = 30 bits)   [3] color RGB
 //   [2] emisión (días desde 2020-01-01)            [2] ingreso a la crew (días, se conserva al renovar)
 //   [16] hash de la contraseña
-//   [2] largo del texto + texto UTF-8 (nombre␟especie␟pronombres␟crew␟rol), deflate si ahorra
+//   [2] largo del texto + texto UTF-8 (nombre␟especie␟pronombres␟crew␟cargo[␟x]), deflate si ahorra
+//       x (opcional) = estadísticas de rol «R1;rol=…;ras=…;s=…;lv=…;xp=…;hp=…;mo=…;t=…». Los lectores
+//       viejos ignoran el sexto texto y las credenciales sin x se siguen leyendo.
 //   por imagen: [1] tipo<<4 | formato  [2] largo  [n] bytes   (tipo 1 foto, 2 logo; formato 1 WebP, 2 JPEG)
 
 const $ = (id) => document.getElementById(id);
@@ -25,7 +27,8 @@ const $ = (id) => document.getElementById(id);
 // g fecha de ingreso a la crew (la primera; renovar no la cambia)
 // s estilo de la crew · l "1" si cada miembro puede elegir su estilo · y estilo elegido por el miembro
 // f "1" si es la credencial del líder (fundador): no vence
-const LIMITES = { n: 40, e: 40, p: 20, c: 30, i: 9, k: 7, r: 30, a: 10, g: 10, h: 22, s: 1, l: 1, y: 1, f: 1 };
+// x estadísticas de rol (contrato R1 con el Explorador estelar; ver «Estadísticas de rol»)
+const LIMITES = { n: 40, e: 40, p: 20, c: 30, i: 9, k: 7, r: 30, a: 10, g: 10, h: 22, s: 1, l: 1, y: 1, f: 1, x: 160 };
 
 // Estilos de credencial: los colores de la muestra son [cabecera, franja, papel].
 const ESTILOS = {
@@ -222,7 +225,10 @@ const unir = (partes) => {
 };
 
 async function empaquetar(d, { foto, logo } = {}) {
-  const textoPlano = new TextEncoder().encode([d.n, d.e, d.p, d.c, d.r].map((t) => t ?? "").join(SEP));
+  // El sexto texto (x) solo va si hay estadísticas: así una credencial sin ellas pesa lo mismo que antes.
+  const textos = [d.n, d.e, d.p, d.c, d.r].map((t) => t ?? "");
+  if (d.x) textos.push(d.x);
+  const textoPlano = new TextEncoder().encode(textos.join(SEP));
   const textoZ = await comprimir(textoPlano);
   const comprimido = textoZ.length < textoPlano.length;
   const texto = comprimido ? textoZ : textoPlano;
@@ -269,10 +275,10 @@ async function desempaquetar(texto) {
   if (cab + 18 + largo > b.length) throw new Error("truncado");
   let t = b.slice(cab + 18, cab + 18 + largo);
   if (banderas & 8) t = await descomprimir(t);
-  const [n, e, p, c, r] = new TextDecoder().decode(t).split(SEP);
+  const [n, e, p, c, r, x] = new TextDecoder().decode(t).split(SEP);
   const hash = b.slice(cab, cab + 16);
   const crudo = {
-    n, e, p, c, r,
+    n, e, p, c, r, x,
     i: idDeBytes(b.slice(2, 6)),
     k: "#" + [...b.slice(6, 9)].map((x) => x.toString(16).padStart(2, "0")).join(""),
     a: fechaDeDias((b[9] << 8) | b[10]),
@@ -316,8 +322,222 @@ function limpiar(o) {
   if (d.l !== "1") delete d.l;
   if (!d.l || !ESTILOS[d.y]) delete d.y;
   if (d.f !== "1") delete d.f;
+  if (d.x) {
+    const st = leerX(d.x); // inválido o de otra versión: la credencial se lee sin estadísticas
+    if (st) d.x = escribirX(st);
+    else delete d.x;
+  }
   if (!d.n || !d.c || !d.i) throw new Error("incompleta");
   return d;
+}
+
+// ---------- Estadísticas de rol (contrato R1 con el Explorador estelar) ----------
+// Sexto texto de la credencial (x), máx. 160 caracteres:
+//   R1;rol=<código>;ras=<Rasgo>;s=<pil>,<ing>,<cie>,<med>,<seg>,<soc>;lv=<nivel>;xp=<xp>;hp=<0-100>;mo=<0-100>;t=<semilla>.<nº>.<total>
+//   Ejemplo: R1;rol=cie;ras=Curioso;s=3,4,9,5,3,4;lv=1;xp=0;hp=100;mo=75;t=8F3A1C2B.1.21
+// Opcionales, añadidos por la Carta Estelar al cerrar una misión (en este orden, antes de t):
+//   fa=<facciones separadas por punto: aa.lc>;iv=<equipo: k,aai,cvc2>
+//   fv=<días de vuelo acumulados>;ms=<misiones completadas>;mi=<código HEX8 de la última misión aplicada>
+// iv: hasta 6 objetos; cada uno es [facción de 2 letras] + letra del objeto + [cantidad 2-9].
+//   Objetos de facción (llevan facción): i insignia, u uniformes, s salvoconducto, r reliquia, t tecnología, c contrabando.
+//   Equipo sin dueño (sin facción): b botiquín, h herramientas, a arma, d traductor, n sensor, k casco.
+// s guarda los valores repartidos SIN el bonus del rasgo (este se suma al mostrar).
+// Al crear: base 3, mín. 1, máx. 10. Al leer se aceptan 1-12 (mejoras ganadas en partida).
+const STATS = [
+  ["pil", "Pilotaje"],
+  ["ing", "Ingeniería"],
+  ["cie", "Ciencia"],
+  ["med", "Medicina"],
+  ["seg", "Seguridad"],
+  ["soc", "Diplomacia"],
+];
+const ROLES = { pil: "Piloto", ing: "Ingeniería", cie: "Ciencia", med: "Medicina", seg: "Seguridad", soc: "Comunicaciones" };
+const RASGOS = {
+  Valiente: { desc: "+1 Seguridad", bonus: { seg: 1 } },
+  Curioso: { desc: "+1 Ciencia", bonus: { cie: 1 } },
+  Cauteloso: { desc: "Recibe la mitad de daño", bonus: {} },
+  Optimista: { desc: "La moral baja la mitad en los viajes", bonus: {} },
+  Gruñón: { desc: "+1 Ingeniería", bonus: { ing: 1 } },
+  Carismático: { desc: "+1 Diplomacia", bonus: { soc: 1 } },
+  "Manos firmes": { desc: "+1 Pilotaje y +1 Medicina", bonus: { pil: 1, med: 1 } },
+  Insomne: { desc: "Más riesgo en hibernación", bonus: {} },
+  Veterano: { desc: "+1 Pilotaje, Seguridad e Ingeniería", bonus: { pil: 1, seg: 1, ing: 1 } },
+};
+const FACCIONES = {
+  aa: ["✦", "Corporación Ad Astra"],
+  lc: ["⚖", "Liga de Comerciantes Libres"],
+  mh: ["⛨", "Manada de Hierro"],
+  ce: ["☾", "Círculo de la Estrella Oscura"],
+  cv: ["☠", "Corsarios del Vacío"],
+  ca: ["⌬", "Custodios del Archivo"],
+};
+const OBJ_FACCION = { i: "Insignia", u: "Uniformes", s: "Salvoconducto", r: "Reliquia", t: "Tecnología", c: "Contrabando" };
+const OBJ_EQUIPO = { b: "Botiquín de campaña", h: "Caja de herramientas", a: "Arma de mano", d: "Traductor universal", n: "Sensor portátil", k: "Casco de vuelo" };
+// "aa.lc" → ["aa","lc"] (sin repetidos ni códigos desconocidos)
+const leerFa = (v) => [...new Set(String(v ?? "").split(".").filter((f) => Object.hasOwn(FACCIONES, f)))].slice(0, 6);
+// "k,aai,cvc2" → [{f:null,o:"k",n:1},{f:"aa",o:"i",n:1},{f:"cv",o:"c",n:2}]
+function leerIv(v) {
+  const out = [];
+  for (const p of String(v ?? "").split(",").slice(0, 6)) {
+    const m = /^(aa|lc|mh|ce|cv|ca)?([a-z])([2-9])?$/.exec(p.trim());
+    if (!m || (m[1] ? !OBJ_FACCION[m[2]] : !OBJ_EQUIPO[m[2]])) continue;
+    out.push({ f: m[1] ?? null, o: m[2], n: +(m[3] ?? 1) });
+  }
+  return out;
+}
+const escribirIv = (iv) => iv.map((x) => `${x.f ?? ""}${x.o}${x.n > 1 ? x.n : ""}`).join(",");
+const nombreObj = (x) => (x.f ? `${OBJ_FACCION[x.o]} (${FACCIONES[x.f][1]})` : OBJ_EQUIPO[x.o]) + (x.n > 1 ? ` ×${x.n}` : "");
+const textoFa = (fa) => (fa.length ? fa.map((f) => `${FACCIONES[f][0]} ${FACCIONES[f][1]}`).join(" · ") : "ninguna");
+const textoIv = (iv) => (iv.length ? iv.map(nombreObj).join(", ") : "nada");
+
+const STAT_BASE = 3;
+const STAT_MIN = 1;
+const STAT_MAX_CREAR = 10;
+const STAT_MAX_LEER = 12;
+const MAX_TIRADAS = 3; // la primera y dos repeticiones
+
+// Días de vuelo → texto corto («3 a 112 d», «45 d»).
+const vuelo = (d) => {
+  if (!d) return "sin vuelos";
+  let a = Math.floor(d / 365.25), r = Math.round(d - a * 365.25);
+  if (r >= 365) (a++, (r = 0));
+  return a ? `${a} año${a === 1 ? "" : "s"}${r ? ` y ${r} d` : ""}` : `${r} d`;
+};
+
+// Valor con el bonus del rasgo (solo para mostrar y para los derivados; nunca se guarda así).
+const bonusDe = (st, k) => RASGOS[st.ras]?.bonus[k] ?? 0;
+const totalDe = (st, k) => st.s[k] + bonusDe(st, k);
+const saludMax = (st) => 50 + 5 * totalDe(st, "seg") + 5 * totalDe(st, "med");
+const moralBase = (st) => 50 + 5 * totalDe(st, "soc");
+
+const entero = (v, min, max) => (/^\d{1,6}$/.test(v ?? "") && +v >= min && +v <= max ? +v : null);
+
+// Texto x → objeto, o null si no es un R1 válido.
+function leerX(x) {
+  if (typeof x !== "string") return null;
+  const partes = x.trim().split(";");
+  if (partes.shift() !== "R1") return null;
+  const kv = {};
+  for (const p of partes) {
+    const i = p.indexOf("=");
+    if (i > 0) kv[p.slice(0, i).trim()] = p.slice(i + 1).trim();
+  }
+  if (!ROLES[kv.rol] || !Object.hasOwn(RASGOS, kv.ras ?? "")) return null;
+  const vals = (kv.s ?? "").split(",").map((v) => entero(v.trim(), STAT_MIN, STAT_MAX_LEER));
+  if (vals.length !== STATS.length || vals.some((v) => v === null)) return null;
+  const st = {
+    rol: kv.rol,
+    ras: kv.ras,
+    s: Object.fromEntries(STATS.map(([k], i) => [k, vals[i]])),
+    lv: entero(kv.lv, 1, 999) ?? 1,
+    xp: entero(kv.xp, 0, 999999) ?? 0,
+    hp: entero(kv.hp, 0, 100) ?? 100,
+    mo: null,
+    t: null,
+  };
+  st.mo = entero(kv.mo, 0, 100) ?? Math.min(100, moralBase(st));
+  st.fa = leerFa(kv.fa);
+  st.iv = leerIv(kv.iv);
+  st.fv = entero(kv.fv, 0, 9999999) ?? 0;
+  st.ms = entero(kv.ms, 0, 99999) ?? 0;
+  st.mi = /^[0-9A-F]{8}$/.test(kv.mi ?? "") ? kv.mi : null;
+  const t = /^([0-9A-Fa-f]{8})\.([1-9])\.(\d{1,2})$/.exec(kv.t ?? "");
+  if (t) st.t = { sem: t[1].toUpperCase(), n: +t[2], total: +t[3] };
+  return st;
+}
+
+// Objeto → texto x (orden y formato exactos del contrato).
+function escribirX(st) {
+  const t = st.t ? `;t=${st.t.sem}.${st.t.n}.${st.t.total}` : "";
+  const f = (st.fa?.length ? `;fa=${st.fa.join(".")}` : "") + (st.iv?.length ? `;iv=${escribirIv(st.iv)}` : "");
+  const v = f + (st.fv ? `;fv=${st.fv}` : "") + (st.ms ? `;ms=${st.ms}` : "") + (st.mi ? `;mi=${st.mi}` : "");
+  return `R1;rol=${st.rol};ras=${st.ras};s=${STATS.map(([k]) => st.s[k]).join(",")};lv=${st.lv};xp=${st.xp};hp=${st.hp};mo=${st.mo}${v}${t}`;
+}
+
+// Tirada reproducible (no usa Math.random):
+//   semilla = FNV-1a de 32 bits del nombre normalizado (NFC, sin espacios de sobra, minúsculas), en UTF-8
+//   PRNG mulberry32 con semilla (semilla XOR nºtirada × 0x9E3779B1); 3 dados de 6 caras; total = 10 + suma
+const normalizarNombre = (n) => String(n ?? "").normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
+function semillaDe(nombre) {
+  let h = 0x811c9dc5;
+  for (const b of new TextEncoder().encode(normalizarNombre(nombre))) h = Math.imul(h ^ b, 0x01000193) >>> 0;
+  return h.toString(16).toUpperCase().padStart(8, "0");
+}
+function mulberry32(a) {
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function tirada(sem, n) {
+  const azar = mulberry32((parseInt(sem, 16) ^ Math.imul(n, 0x9e3779b1)) >>> 0);
+  const dados = [0, 0, 0].map(() => 1 + Math.floor(azar() * 6));
+  return { sem, n, dados, total: 10 + dados.reduce((a, b) => a + b, 0) };
+}
+// Dados de una tirada guardada, si cuadran con su total.
+const dadosDe = (t) => {
+  if (!t) return null;
+  const r = tirada(t.sem, t.n);
+  return r.total === t.total ? r.dados : null;
+};
+const CARA_DADO = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+
+// Ficha de rol (tercera cara de la credencial).
+//   st: estadísticas (o null si la credencial no las tiene) · avance: texto opcional mientras se reparten
+function fichaRol(d, st, { avance = "" } = {}) {
+  const color = esc(d.k);
+  const cab = `<div class="cred-ranura" aria-hidden="true"></div>
+      <header class="rev-cab">
+        <p class="cred-org">Corporación Ad Astra</p>
+        <p class="cred-sub">Ficha de tripulante</p>
+      </header>`;
+  if (!st) {
+    return `<article class="credencial cred-ficha estilo-${estiloDe(d)}" style="--crew:${color}" aria-label="Ficha de rol" data-sufijo="-ficha">
+      ${cab}
+      <div class="ficha-vacia"><img src="logo.png" alt=""><p>${esc(avance || "Sin estadísticas de rol.")}</p>
+        ${avance ? "" : "<small>Se completan al renovar la credencial con la contraseña de la crew.</small>"}</div>
+      <footer class="cred-franja">Per aspera ad astra</footer>
+    </article>`;
+  }
+  const filas = STATS.map(([k, nombre]) => {
+    const b = bonusDe(st, k);
+    const v = st.s[k];
+    return `<div class="stat">
+        <span class="stat-nombre">${nombre}</span>
+        <span class="stat-barra" aria-hidden="true"><i style="width:${(v / STAT_MAX_LEER) * 100}%"></i>${b ? `<b style="width:${(b / STAT_MAX_LEER) * 100}%"></b>` : ""}</span>
+        <span class="stat-valor">${v}${b ? `<em>+${b}</em>` : ""}</span>
+      </div>`;
+  }).join("");
+  const dados = dadosDe(st.t);
+  const tiradaTxt = st.t
+    ? `${dados ? `<span class="dados" aria-hidden="true">${dados.map((x) => CARA_DADO[x]).join("")}</span> 10 + ${dados.join(" + ")} = ` : "Reserva "}<strong>${st.t.total}</strong> · tirada ${st.t.n} de ${MAX_TIRADAS}`
+    : "Sin tirada registrada";
+  const rasgo = RASGOS[st.ras];
+  return `<article class="credencial cred-ficha estilo-${estiloDe(d)}" style="--crew:${color}" aria-label="Ficha de rol" data-sufijo="-ficha">
+      ${cab}
+      <div class="ficha-quien">
+        <p class="ficha-nombre">${esc(d.n)}</p>
+        <p class="ficha-nivel">Nivel ${st.lv} · ${st.xp} XP${st.fv || st.ms ? ` · ${vuelo(st.fv)} de vuelo · ${st.ms} misi${st.ms === 1 ? "ón" : "ones"}` : ""}</p>
+      </div>
+      <dl class="ficha-rol">
+        <dt>Rol</dt><dd>${esc(ROLES[st.rol] ?? "—")}</dd>
+        <dt>Rasgo</dt><dd>${esc(st.ras || "—")}${rasgo ? ` <small>${esc(rasgo.desc)}</small>` : ""}</dd>
+      </dl>
+      <div class="ficha-stats">${filas}</div>
+      ${st.fa?.length || st.iv?.length ? `<dl class="ficha-rol ficha-extra">${st.fa?.length ? `<dt>Facciones</dt><dd>${esc(textoFa(st.fa))}</dd>` : ""}${st.iv?.length ? `<dt>Equipo</dt><dd>${esc(textoIv(st.iv))}</dd>` : ""}</dl>` : ""}
+      <p class="ficha-leyenda"><i></i> base <b></b> bonus del rasgo</p>
+      <dl class="ficha-derivados">
+        <div><dt>Salud máx.</dt><dd>${saludMax(st)}</dd></div>
+        <div><dt>Salud</dt><dd>${st.hp}%</dd></div>
+        <div><dt>Moral base</dt><dd>${moralBase(st)}</dd></div>
+        <div><dt>Moral</dt><dd>${st.mo}</dd></div>
+      </dl>
+      <p class="ficha-tirada">${tiradaTxt}${avance ? `<br><span class="ficha-avance">${esc(avance)}</span>` : ""}</p>
+      <footer class="cred-franja">Per aspera ad astra</footer>
+    </article>`;
 }
 
 const base = () => `${location.origin}${location.pathname}#C`;
@@ -491,14 +711,15 @@ function logoCrew(d, logoUrl) {
 }
 
 // ---------- Credencial (frente y reverso) ----------
-async function credencial(d, { foto, logo }) {
+// ficha: estadísticas a mostrar (por defecto, las de d.x) · avance: nota mientras se reparten
+async function credencial(d, { foto, logo }, { ficha = leerX(d.x), avance = "" } = {}) {
   const color = esc(d.k);
   const vence = textoVence(d);
   const venc = vencida(d);
   const sello = venc ? `<div class="sello-vencida" aria-label="Credencial vencida">Vencida</div>` : "";
   return `
   <div class="caras${venc ? " vencida" : ""}">
-    <article class="credencial estilo-${estiloDe(d)}" style="--crew:${color}" aria-label="Frente">
+    <article class="credencial estilo-${estiloDe(d)}" style="--crew:${color}" aria-label="Frente" data-sufijo="-frente">
       <div class="cred-ranura" aria-hidden="true"></div>
       <header class="cred-cab">
         <img class="cred-logo" src="logo.png" alt="">
@@ -524,7 +745,7 @@ async function credencial(d, { foto, logo }) {
       <div class="cred-datos">
         <dl>
           <dt>Crew</dt><dd>${esc(d.c)}</dd>
-          <dt>Rol</dt><dd>${esc(d.r || "Tripulante")}</dd>
+          <dt>Cargo</dt><dd>${esc(d.r || "Tripulante")}</dd>
           <dt class="solo-descarga">ID</dt><dd class="solo-descarga" data-id-miembro></dd>
           <dt>Ingreso</dt><dd>${esc(d.g || d.a || "")}</dd>
           <dt>Emisión</dt><dd>${esc(d.a || "")}</dd>
@@ -535,7 +756,9 @@ async function credencial(d, { foto, logo }) {
       <footer class="cred-franja">Per aspera ad astra</footer>
     </article>
 
-    <article class="credencial cred-reverso estilo-${estiloDe(d)}" style="--crew:${color}" aria-label="Reverso">
+    ${fichaRol(d, ficha, { avance })}
+
+    <article class="credencial cred-reverso estilo-${estiloDe(d)}" style="--crew:${color}" aria-label="Reverso" data-sufijo="-reverso">
       <div class="cred-ranura" aria-hidden="true"></div>
       <header class="rev-cab">
         <p class="cred-org">Corporación Ad Astra</p>
@@ -626,6 +849,7 @@ function precargarImagenes(...fuentes) {
 
 // ---------- Acciones ----------
 let credencialActual = null; // { d, datos }: lo necesario para el QR y los IDs, que solo van en las descargas
+let statsPendiente = ""; // qué falta de las estadísticas para poder emitir la credencial
 
 // El reverso con el QR y los IDs de crew y tripulante no se muestran en pantalla: se generan
 // solo en el archivo descargado (PNG o PDF), para que una captura de la vista no sirva de credencial.
@@ -743,8 +967,8 @@ async function descargarPng(boton, modo = "separadas") {
     await completarParaDescarga(copia);
     estado("Preparando las imágenes…");
     const bloqueadas = await prepararImagenesExternas(copia);
-    const [frente, reverso] = copia.querySelectorAll(".credencial");
-    const piezas = modo === "juntas" ? [[copia, ""]] : [[frente, "-frente"], [reverso, "-reverso"]];
+    // Frente, ficha de rol y reverso: un archivo por cara, o todas en una imagen.
+    const piezas = modo === "juntas" ? [[copia, ""]] : [...copia.querySelectorAll(".credencial")].map((c) => [c, c.dataset.sufijo]);
     if (modo === "juntas") copia.classList.add("juntas");
     for (const [elemento, sufijo] of piezas) {
       const canvas = await window.html2canvas(elemento, { scale: 3, backgroundColor: null, useCORS: true });
@@ -752,9 +976,9 @@ async function descargarPng(boton, modo = "separadas") {
       const url = URL.createObjectURL(blob);
       descargar(url, `${nombreArchivo}${sufijo}.png`);
       setTimeout(() => URL.revokeObjectURL(url), 10000);
-      if (piezas.length > 1) await new Promise((r) => setTimeout(r, 400)); // algunos navegadores bloquean dos descargas seguidas
+      if (piezas.length > 1) await new Promise((r) => setTimeout(r, 400)); // algunos navegadores bloquean descargas seguidas
     }
-    const hecho = modo === "juntas" ? "Listo: descargaste las dos caras en una imagen." : "Listo: frente y reverso descargados.";
+    const hecho = modo === "juntas" ? "Listo: descargaste las caras en una imagen." : "Listo: frente, ficha y reverso descargados.";
     estado(
       bloqueadas
         ? `${hecho} No pude traer la imagen enlazada para el PNG, así que va el emblema en su lugar. Si la quieres, guarda el PDF o sube el archivo.`
@@ -773,6 +997,9 @@ document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-accion]");
   if (!b) return;
   const accion = b.dataset.accion;
+  // No se emite (PNG/PDF) hasta tirar y repartir todos los puntos, con rol y rasgo elegidos.
+  if ((accion === "pdf" || accion === "png") && !$("crear").hidden && !credencialActual)
+    return estado(statsPendiente || "Completa la credencial antes de descargarla.", true);
   if (accion === "pdf") {
     const caras = document.querySelector("main:not([hidden]) .caras");
     if (caras) {
@@ -788,8 +1015,8 @@ document.addEventListener("click", async (e) => {
 });
 
 function mostrar(id) {
-  for (const s of ["clave", "leer-qr", "crear", "ver", "error"]) $(s).hidden = s !== id;
-  if (id !== "leer-qr") detenerCamara();
+  for (const s of ["clave", "leer-qr", "crear", "ver", "error", "actualizar"]) $(s).hidden = s !== id;
+  if (id !== "leer-qr" && id !== "actualizar") detenerCamara();
   if (id !== "crear") $("vista-crear").innerHTML = "";
   window.scrollTo(0, 0);
 }
@@ -821,18 +1048,53 @@ async function modoVer(datos) {
   respaldoImagenes($("vista-ver"));
 
   const venc = vencida(d);
+  // El líder no renueva (no vence), salvo para completar las estadísticas de una credencial antigua.
   $("boton-unirse").hidden = !d.h || venc;
-  $("boton-renovar").hidden = !d.h || esLider(d);
+  $("boton-renovar").hidden = !d.h || (esLider(d) && d.x);
+  $("boton-renovar").textContent = esLider(d) ? "Completar estadísticas" : "Renovar";
   $("boton-unirse").onclick = () => modoClave({ modo: "unirse", d, logo: logoBlob });
   $("boton-renovar").onclick = () => modoClave({ modo: "renovar", d, logo: logoBlob, foto: fotoBlob });
-  $("ver-aviso").textContent = esLider(d)
+  // Llevar al Explorador estelar: copia el enlace de esta credencial (#C…) para pegarlo allí.
+  $("boton-explorador").hidden = venc;
+  $("boton-explorador").onclick = () => copiarParaExplorador(base() + datos, d);
+  estado("", false, "ver-estado");
+  $("ver-aviso").textContent = (esLider(d)
     ? "Es la credencial del líder de la crew, así que no vence."
     : !d.a
     ? "A esta credencial le falta la fecha de emisión."
     : venc
       ? `Venció el ${venceDe(d.a)}. Hasta que su dueño la renueve, no sirve para invitar.`
-      : `Vigente hasta el ${venceDe(d.a)}.`;
+      : `Vigente hasta el ${venceDe(d.a)}.`) +
+    (d.x ? "" : " No tiene estadísticas de rol: se completan al renovarla con la contraseña de la crew.");
   mostrar("ver");
+}
+
+async function copiarTexto(texto) {
+  try {
+    await navigator.clipboard.writeText(texto);
+    return true;
+  } catch {
+    // Respaldo para navegadores sin permiso de portapapeles
+    const area = Object.assign(document.createElement("textarea"), { value: texto });
+    area.setAttribute("readonly", "");
+    area.style.cssText = "position:fixed;left:-9999px";
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand?.("copy") ?? false;
+    area.remove();
+    return ok;
+  }
+}
+async function copiarParaExplorador(enlace, d) {
+  const ok = await copiarTexto(enlace);
+  const sinStats = d.x ? "" : " Ojo: esta credencial aún no tiene estadísticas de rol; renuévala para completarlas.";
+  estado(
+    ok
+      ? `Enlace copiado. En el Explorador estelar, pégalo (o sube el PNG del reverso de tu credencial) para unirte a una partida.${sinStats}`
+      : "No pude copiar el enlace. En el Explorador estelar también puedes subir el PNG del reverso de tu credencial.",
+    !ok,
+    "ver-estado"
+  );
 }
 
 // Selector visual de estilos (radios con una muestra de colores).
@@ -848,7 +1110,8 @@ function pintarMuestras(contenedor, nombre, elegido) {
 }
 
 // ---------- Contraseña: fundar, unirse o renovar ----------
-function modoClave({ modo, d, logo, foto }) {
+// modo: fundar · unirse · renovar · actualizar (desde una partida del Explorador; xNuevo = estadísticas nuevas)
+function modoClave({ modo, d, logo, foto, xNuevo }) {
   const form = $("form-clave");
   form.reset();
   const fundar = modo === "fundar";
@@ -856,12 +1119,14 @@ function modoClave({ modo, d, logo, foto }) {
   $("nota-unirse").hidden = !fundar;
   if (fundar) pintarMuestras($("muestras-crew"), "estilo", "1");
   $("campo-confirmar").hidden = !fundar;
-  $("clave-eyebrow").textContent = { fundar: "Fundar una crew", unirse: "Unirse a la tripulación", renovar: "Renovar credencial" }[modo];
+  $("clave-eyebrow").textContent = { fundar: "Fundar una crew", unirse: "Unirse a la tripulación", renovar: "Renovar credencial", actualizar: "Actualizar personaje" }[modo];
   $("clave-titulo").textContent = fundar ? "Nueva crew" : `Crew ${d.c}`;
   $("clave-id").hidden = true; // el ID de la crew solo aparece en los archivos descargados
   $("clave-ayuda").textContent = fundar
     ? "Ponle nombre, color y contraseña. Se le asigna un ID propio, así que puede haber otra con el mismo nombre. Comparte la contraseña solo con quien quieras dentro: cualquier miembro puede invitar con el QR de su credencial."
-    : modo === "renovar"
+    : modo === "actualizar"
+      ? `Con la contraseña de la crew sacas tu credencial renovada con las estadísticas de la partida. Se conservan tus datos, tu crew y la fecha en que entraste (${d.g || d.a}).`
+      : modo === "renovar"
       ? `Con la contraseña de la crew sacas una credencial nueva, válida por un año. Se conservan tus datos y la fecha en que entraste a la crew (${d.g || d.a}).`
       : "Escribe la contraseña que te pasó alguien de la crew.";
   estado("", false, "clave-estado");
@@ -894,15 +1159,158 @@ function modoClave({ modo, d, logo, foto }) {
     modoCrear({
       crew: { c: d.c, i: d.i, k: d.k, s: d.s, ...(d.l ? { l: d.l } : {}), h: d.h },
       logoHeredado: logo,
-      previo: modo === "renovar" ? { d, foto } : null,
+      previo: modo === "renovar" || modo === "actualizar" ? { d, foto } : null,
+      // Renovar o actualizar conserva la marca de líder; unirse nunca la hereda.
+      lider: modo !== "unirse" && esLider(d),
+      xFijo: modo === "actualizar" ? xNuevo : null,
     });
   };
 }
 
+// ---------- Estadísticas en el formulario: tirada, reparto, rol y rasgo ----------
+// fijo: estadísticas que no se tocan (vienen de una partida o de la credencial que se renueva).
+// origen: nueva · completar (credencial vieja sin estadísticas) · renovar · partida
+// Devuelve { ficha(), pendiente() }: lo que se muestra y qué falta para poder emitir.
+const reducirMovimiento = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+function prepararStats(form, fijo, { origen, alCambiar }) {
+  $("stats-editable").hidden = !!fijo;
+  $("stats-fijo").hidden = !fijo;
+  const aviso = {
+    partida: "Estas estadísticas vienen de una partida del Explorador estelar y se guardan tal cual.",
+    renovar: "Se conservan las estadísticas de tu credencial. Solo cambian con una partida del Explorador estelar.",
+    completar: "Tu credencial no tenía estadísticas de rol. Tíralas y repártelas para renovarla.",
+  }[origen];
+  $("stats-aviso").hidden = !aviso;
+  $("stats-aviso").textContent = aviso ?? "";
+
+  const tiradas = []; // { sem, n, dados, total }
+  const inicial = () => Object.fromEntries(STATS.map(([k]) => [k, STAT_BASE]));
+  let s = inicial();
+  let animando = false;
+  const ultima = () => tiradas.at(-1);
+  const gastados = () => STATS.reduce((t, [k]) => t + s[k] - STAT_BASE, 0);
+  const restantes = () => (ultima()?.total ?? 0) - gastados();
+
+  function ficha() {
+    if (fijo) return fijo;
+    const t = ultima();
+    if (!t) return null;
+    const st = { rol: form.rolJuego.value, ras: form.rasgo.value, s: { ...s }, lv: 1, xp: 0, hp: 100, mo: 0, t: { sem: t.sem, n: t.n, total: t.total } };
+    st.mo = Math.min(100, moralBase(st));
+    return st;
+  }
+  function pendiente() {
+    if (fijo) return "";
+    if (!ultima()) return "Tira los dados para obtener tu reserva de puntos de rol.";
+    const r = restantes();
+    if (r > 0) return `Te ${r === 1 ? "queda 1 punto" : `quedan ${r} puntos`} de rol por repartir.`;
+    if (!ROLES[form.rolJuego.value]) return "Elige el rol de tu personaje.";
+    if (!Object.hasOwn(RASGOS, form.rasgo.value)) return "Elige un rasgo para tu personaje.";
+    return "";
+  }
+
+  function pintarDados(dados) {
+    $("dados").innerHTML = dados.map((x) => `<span class="dado">${x || "?"}</span>`).join("");
+  }
+  function pintarStats() {
+    const st = ficha() ?? { ras: form.rasgo.value, s };
+    if (fijo) {
+      const dados = dadosDe(fijo.t);
+      $("stats-fijo").innerHTML = `<dl class="stats-resumen">
+        <dt>Rol</dt><dd>${esc(ROLES[fijo.rol])}</dd>
+        <dt>Rasgo</dt><dd>${esc(fijo.ras)} · ${esc(RASGOS[fijo.ras].desc)}</dd>
+        ${STATS.map(([k, nombre]) => `<dt>${nombre}</dt><dd>${fijo.s[k]}${bonusDe(fijo, k) ? ` <em class="bonus">+${bonusDe(fijo, k)}</em>` : ""}</dd>`).join("")}
+        <dt>Nivel</dt><dd>${fijo.lv} · ${fijo.xp} XP</dd>
+        <dt>Tirada</dt><dd>${fijo.t ? `${dados ? `10 + ${dados.join(" + ")} = ` : ""}${fijo.t.total}` : "—"}</dd>
+      </dl>`;
+    } else {
+      const t = ultima();
+      const r = restantes();
+      $("tirada-total").textContent = t ? `Reserva: ${t.total} puntos` : "Reserva: sin tirar";
+      $("tirada-info").textContent = t
+        ? t.n >= MAX_TIRADAS
+          ? `Tirada ${t.n} de ${MAX_TIRADAS}: queda fija.`
+          : `Tirada ${t.n} de ${MAX_TIRADAS}. Puedes repetir ${MAX_TIRADAS - t.n === 1 ? "1 vez más" : `${MAX_TIRADAS - t.n} veces más`} (se reinicia el reparto).`
+        : "10 + 3d6. Puedes repetir la tirada hasta 2 veces; la última queda.";
+      $("boton-tirar").textContent = !t ? "Tirar" : t.n >= MAX_TIRADAS ? "Tirada fija" : "Repetir tirada";
+      $("boton-tirar").disabled = animando || (t?.n ?? 0) >= MAX_TIRADAS;
+      if (!animando) pintarDados(t ? t.dados : [0, 0, 0]);
+      $("reparto").innerHTML = STATS.map(([k, nombre]) => {
+        const b = bonusDe(st, k);
+        return `<div class="reparto-fila">
+          <span>${nombre}</span>
+          <button type="button" class="boton secundario mini" data-stat="${k}" data-delta="-1" aria-label="Quitar un punto a ${nombre}"${!t || s[k] <= STAT_MIN ? " disabled" : ""}>−</button>
+          <output>${s[k]}${b ? `<em class="bonus">+${b}</em>` : ""}</output>
+          <button type="button" class="boton secundario mini" data-stat="${k}" data-delta="1" aria-label="Sumar un punto a ${nombre}"${!t || r <= 0 || s[k] >= STAT_MAX_CREAR ? " disabled" : ""}>+</button>
+        </div>`;
+      }).join("");
+      $("restantes").textContent = t ? `Puntos restantes: ${r}` : "Puntos restantes: —";
+      $("restantes").classList.toggle("listo", !!t && r === 0);
+      $("reiniciar-reparto").disabled = !t || STATS.every(([k]) => s[k] === STAT_BASE);
+      const ras = RASGOS[form.rasgo.value];
+      $("rasgo-desc").textContent = ras ? `${form.rasgo.value}: ${ras.desc}. El bonus se muestra aparte y no se suma a los puntos repartidos.` : "";
+    }
+    const f = ficha();
+    $("derivados").innerHTML = f
+      ? `<div><dt>Salud máx.</dt><dd>${saludMax(f)}</dd></div><div><dt>Moral base</dt><dd>${moralBase(f)}</dd></div>
+         <div><dt>Nivel</dt><dd>${f.lv}</dd></div><div><dt>XP</dt><dd>${f.xp}</dd></div>`
+      : "";
+  }
+  const cambio = () => {
+    pintarStats();
+    alCambiar();
+  };
+
+  form.rolJuego.innerHTML = `<option value="">Elige…</option>` + Object.entries(ROLES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+  form.rasgo.innerHTML = `<option value="">Elige…</option>` + Object.entries(RASGOS).map(([k, v]) => `<option value="${esc(k)}">${esc(k)} (${esc(v.desc)})</option>`).join("");
+  form.rolJuego.onchange = form.rasgo.onchange = cambio;
+
+  $("boton-tirar").onclick = async () => {
+    if (fijo || animando || tiradas.length >= MAX_TIRADAS) return;
+    if (!form.n.value.trim()) {
+      $("tirada-info").textContent = "Escribe primero el nombre de tu fursona: la tirada sale de él.";
+      return form.n.focus();
+    }
+    const t = tirada(semillaDe(form.n.value), tiradas.length + 1);
+    animando = true;
+    pintarStats();
+    const caja = $("dados");
+    caja.classList.add("rodando");
+    if (!reducirMovimiento()) {
+      for (let cuadro = 0; cuadro < 9; cuadro++) {
+        pintarDados([0, 1, 2].map((i) => ((cuadro * 5 + i * 2 + t.n) % 6) + 1));
+        await new Promise((r) => setTimeout(r, 70));
+      }
+    }
+    caja.classList.remove("rodando");
+    animando = false;
+    tiradas.push(t);
+    s = inicial(); // nueva reserva: el reparto empieza de cero
+    cambio();
+  };
+  $("reparto").onclick = (e) => {
+    const b = e.target.closest("[data-stat]");
+    if (!b || b.disabled) return;
+    const k = b.dataset.stat;
+    const v = s[k] + Number(b.dataset.delta);
+    if (v < STAT_MIN || v > STAT_MAX_CREAR) return;
+    if (Number(b.dataset.delta) > 0 && restantes() <= 0) return;
+    s[k] = v;
+    cambio();
+  };
+  $("reiniciar-reparto").onclick = () => {
+    s = inicial();
+    cambio();
+  };
+  pintarStats();
+  return { ficha, pendiente };
+}
+
 // ---------- Crear ----------
-async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
+async function modoCrear({ crew, logoHeredado, previo, lider = false, xFijo = null }) {
   const form = $("form");
   form.reset();
+  credencialActual = null;
   if (previo) for (const k of ["n", "e", "p", "r"]) form[k].value = previo.d[k] ?? "";
   const emision = hoy();
   // Al renovar se conserva la fecha en que entró a la crew por primera vez.
@@ -912,6 +1320,12 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   $("fechas").textContent = lider
     ? `Emitida el ${emision}. Como eres el líder, no vence.`
     : `${previo ? `En la crew desde el ${ingreso}. ` : ""}Emitida el ${emision}. Vence el ${venceDe(emision)}.`;
+  // Estadísticas: fijas si vienen de una partida (xFijo) o de la credencial que se renueva;
+  // si no, se tiran y se reparten aquí.
+  const rol = prepararStats(form, leerX(xFijo ?? previo?.d.x), {
+    origen: xFijo ? "partida" : previo?.d.x ? "renovar" : previo ? "completar" : "nueva",
+    alCambiar: () => pintar(),
+  });
   if (lider && !form.r.value) form.r.value = "Líder";
   $("logo-heredado").hidden = !logoHeredado;
   for (const id of ["precarga-fotoEnlace", "precarga-logoEnlace"]) $(id).hidden = true;
@@ -1020,11 +1434,15 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
   }
 
   let turno = 0;
+  let estadoPrevio = "";
   async function pintar() {
     const mio = ++turno;
     const crudo = { n: form.n.value, e: form.e.value, p: form.p.value, r: form.r.value, ...crew, a: emision, g: ingreso };
     if (lider) crudo.f = "1"; // la marca de líder no está en `crew`, así que nadie la hereda
     if (libre) crudo.y = form.y.value;
+    const ficha = rol.ficha();
+    statsPendiente = rol.pendiente();
+    if (!statsPendiente) crudo.x = escribirX(ficha);
     let d;
     try {
       d = limpiar(crudo);
@@ -1037,11 +1455,16 @@ async function modoCrear({ crew, logoHeredado, previo, lider = false }) {
       logo: logoEnlace ? imagenEnlace(logoEnlace) : miniLogo,
     });
     if (mio !== turno) return; // llegó una edición más reciente
-    credencialActual = { d, datos };
+    // Sin estadísticas completas no se puede emitir: no hay QR ni descarga.
+    credencialActual = statsPendiente ? null : { d, datos };
+    for (const b of document.querySelectorAll('#crear [data-accion="png"], #crear [data-accion="pdf"]')) b.classList.toggle("bloqueado", !!statsPendiente);
+    if (statsPendiente) estado(statsPendiente);
+    else if ($("estado").textContent === estadoPrevio) estado("");
+    estadoPrevio = statsPendiente;
     nombreArchivo = `credencial-${slug(d.n)}`;
     if (!generarQr(base(), datos)) estado("No cabe todo en el QR. Prueba con una imagen más sencilla o usa un enlace.", true);
     // Vista: el archivo local si lo hay (mejor calidad); si no, el enlace.
-    $("vista-crear").innerHTML = await credencial(d, { foto: fotoUrl || fotoEnlace, logo: logoUrl || logoEnlace });
+    $("vista-crear").innerHTML = await credencial(d, { foto: fotoUrl || fotoEnlace, logo: logoUrl || logoEnlace }, { ficha, avance: statsPendiente });
     respaldoImagenes($("vista-crear"));
   }
 
@@ -1102,8 +1525,9 @@ async function leerQr(fuente, ancho, alto) {
 }
 
 // Del texto del QR saca los datos de la credencial y pasa a pedir la contraseña.
+const extraerC = (texto) => /#C([0-9A-Z$*+\-./:]+)\s*$/.exec(String(texto ?? "").trim());
 async function unirseConTexto(texto) {
-  const m = /#C([0-9A-Z$*+\-./:]+)\s*$/.exec(texto ?? "");
+  const m = extraerC(texto);
   if (!m) return estado("Ese QR no es de una credencial de Ad Astra.", true, "qr-estado");
   let paquete;
   try {
@@ -1122,32 +1546,34 @@ let camara = null;
 function detenerCamara() {
   camara?.getTracks().forEach((t) => t.stop());
   camara = null;
-  const v = $("qr-video");
-  if (v) {
+  for (const v of [$("qr-video"), $("act-video")]) {
+    if (!v) continue;
     v.srcObject = null;
     v.hidden = true;
   }
 }
 
-async function usarCamara() {
-  if (!navigator.mediaDevices?.getUserMedia) return estado("Este navegador no deja usar la cámara. Sube una imagen del QR.", true, "qr-estado");
+// Lee QR con la cámara hasta que alLeer acepte uno (o se cambie de pantalla).
+async function usarCamara(videoId = "qr-video", estadoId = "qr-estado", alLeer = unirseConTexto) {
+  if (!navigator.mediaDevices?.getUserMedia) return estado("Este navegador no deja usar la cámara. Sube una imagen del QR.", true, estadoId);
+  detenerCamara();
   try {
     camara = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
   } catch {
-    return estado("No pude abrir la cámara. Revisa el permiso o sube una imagen del QR.", true, "qr-estado");
+    return estado("No pude abrir la cámara. Revisa el permiso o sube una imagen del QR.", true, estadoId);
   }
-  const v = $("qr-video");
+  const v = $(videoId);
   v.srcObject = camara;
   v.hidden = false;
   await v.play().catch(() => {});
-  estado("Apunta al QR y mantenlo quieto un momento…", false, "qr-estado");
+  estado("Apunta al QR y mantenlo quieto un momento…", false, estadoId);
   const flujo = camara;
   while (camara === flujo) {
     await new Promise((r) => setTimeout(r, 300));
     if (camara !== flujo || !v.videoWidth) continue;
     const texto = await leerQr(v, v.videoWidth, v.videoHeight).catch(() => "");
     if (texto && camara === flujo) {
-      await unirseConTexto(texto);
+      await alLeer(texto);
       if (camara === flujo) await new Promise((r) => setTimeout(r, 1500)); // QR ajeno: se sigue intentando
     }
   }
@@ -1157,7 +1583,7 @@ function modoLeerQr() {
   estado("", false, "qr-estado");
   $("qr-archivo").value = "";
   mostrar("leer-qr");
-  $("qr-camara").onclick = usarCamara;
+  $("qr-camara").onclick = () => usarCamara();
   $("qr-archivo").onchange = async () => {
     const f = $("qr-archivo").files[0];
     if (!f) return;
@@ -1175,8 +1601,283 @@ function modoLeerQr() {
   };
 }
 
+// ---------- Actualización desde el Explorador estelar (#X…) ----------
+// Enlace: <página>#X<base43>. Los bytes son deflate-raw de un JSON UTF-8:
+//   {"v":1,"id":"AA-XXXX","n":"Nombre","e":"Especie","x":"R1;…","res":"resumen de la partida"}
+// id es el ID de miembro (idDe). Se aplica sobre la credencial actual, que hay que escanear o
+// subir: su ID tiene que coincidir. Luego se pide la contraseña de la crew, como al renovar.
+// v2 = QR general de fin de misión de la Carta Estelar (uno para toda la tripulación):
+//   {"v":2,"mi":{"id":"HEX8","f":"AAAA-MM-DD","nave":"…","dn":<días a bordo>,"ye":<años en la Tierra>,"ly":<años luz>,
+//    "sj":<saltos>,"ss":<sistemas>,"q":<misiones de historia>},"c":[{"id":"AA-XXXX","n","e","x":"R1;…","dv":<días de vuelo>,"res"}]}
+// Cada jugador escanea ese QR y después su credencial: se aplica la entrada cuyo id coincide.
+async function leerActualizacion(texto) {
+  if (texto.length > 4400) throw new Error("demasiado largo");
+  const j = JSON.parse(new TextDecoder().decode(await descomprimir(deBase43(texto))));
+  const txt = (v, max) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+  const persona = (p) => {
+    if (typeof p?.id !== "string" || !/^AA-[A-Z2-9]{4}$/.test(p.id)) throw new Error("sin ID");
+    const st = leerX(p.x);
+    if (!st || p.x.length > LIMITES.x) throw new Error("estadísticas inválidas");
+    return { id: p.id, n: txt(p.n, LIMITES.n), e: txt(p.e, LIMITES.e), st, x: escribirX(st), res: txt(p.res, 500), dv: entero(String(p.dv ?? 0), 0, 9999999) ?? 0 };
+  };
+  if (j?.v === 1) return { ...persona(j), mision: null, todos: null };
+  if (j?.v !== 2 || !Array.isArray(j.c) || !j.c.length || j.c.length > 12) throw new Error("versión desconocida");
+  const mi = j.mi ?? {};
+  if (!/^[0-9A-F]{8}$/.test(mi.id ?? "")) throw new Error("misión sin código");
+  const num = (v) => (Number.isFinite(+v) && +v >= 0 ? +v : 0);
+  const mision = { id: mi.id, f: txt(mi.f, 10), nave: txt(mi.nave, 60), dn: num(mi.dn), ye: num(mi.ye), ly: num(mi.ly), sj: num(mi.sj), ss: num(mi.ss), q: num(mi.q) };
+  return { mision, todos: j.c.map(persona) };
+}
+
+// Tabla: estadísticas anteriores (si ya se leyó la credencial) frente a las nuevas.
+function tablaComparativa(antes, nueva) {
+  const celda = (st, k) => (!st ? "—" : `${st.s[k]}${bonusDe(st, k) ? ` <em class="bonus">+${bonusDe(st, k)}</em>` : ""}`);
+  const filas = [
+    ["Rol", (st) => esc(ROLES[st.rol])],
+    ["Rasgo", (st) => esc(st.ras)],
+    ...STATS.map(([k, nombre]) => [nombre, (st) => celda(st, k), k]),
+    ["Nivel", (st) => st.lv],
+    ["XP", (st) => st.xp],
+    ["Tiempo de vuelo", (st) => vuelo(st.fv)],
+    ["Misiones", (st) => st.ms],
+    ["Facciones", (st) => esc(textoFa(st.fa ?? []))],
+    ["Equipo", (st) => esc(textoIv(st.iv ?? []))],
+    ["Salud", (st) => `${st.hp}% de ${saludMax(st)}`],
+    ["Moral", (st) => st.mo],
+  ];
+  const cambia = (f) => antes && String(f(antes)) !== String(f(nueva));
+  return `<table class="comparar">
+    <thead><tr><th></th><th>Antes</th><th>Después</th></tr></thead>
+    <tbody>${filas
+      .map(([nombre, f]) => `<tr class="${cambia(f) ? "cambia" : ""}"><th>${nombre}</th><td>${antes ? f(antes) : antes === null ? "sin estadísticas" : "—"}</td><td>${f(nueva)}</td></tr>`)
+      .join("")}</tbody></table>`;
+}
+
+async function modoActualizar(texto) {
+  history.replaceState(null, "", location.pathname + location.search); // el enlace no queda en la barra de direcciones
+  let act;
+  try {
+    act = await leerActualizacion(texto);
+  } catch (e) {
+    console.warn("Actualización inválida:", e.message);
+    $("error").querySelector(".vacio").textContent = "Este enlace no trae una actualización de personaje válida.";
+    return mostrar("error");
+  }
+  const mision = act.mision;
+  if (mision) {
+    const m = mision;
+    document.title = "Fin de misión · Corporación Ad Astra";
+    $("act-titulo").textContent = "Fin de misión: actualiza tu personaje";
+    $("act-quien").textContent = `Tripulación: ${act.todos.map((p) => p.n).join(", ")}`;
+    $("act-resumen").textContent = `Misión ${m.id}${m.f ? ` del ${m.f}` : ""}${m.nave ? ` a bordo de ${m.nave}` : ""}: ${vuelo(Math.round(m.dn))} a bordo, ${m.ye.toFixed(1)} años en la Tierra, ${m.ly.toFixed(1)} años luz, ${m.sj} saltos, ${m.ss} sistemas registrados.`;
+    $("act-tabla").innerHTML = "";
+  } else {
+    document.title = `Actualizar a ${act.n || "tu personaje"} · Corporación Ad Astra`;
+    $("act-titulo").textContent = "Actualización de personaje desde una partida";
+    $("act-quien").textContent = [act.n, act.e].filter(Boolean).join(" · ");
+    $("act-resumen").textContent = act.res || "La partida no trae resumen.";
+    $("act-tabla").innerHTML = tablaComparativa(undefined, act.st);
+  }
+  $("act-continuar").hidden = true;
+  $("act-enlace").value = "";
+  $("act-archivo").value = "";
+  estado("", false, "act-estado");
+
+  // Lee la credencial actual (QR o enlace #C…) y comprueba que es del mismo personaje.
+  let lista = null;
+  async function alLeer(textoQr) {
+    const m = extraerC(textoQr);
+    if (!m) return estado("Eso no es una credencial de Ad Astra.", true, "act-estado");
+    let paquete;
+    try {
+      paquete = await desempaquetar(m[1]);
+    } catch {
+      return estado("Leí la credencial, pero viene incompleta o dañada.", true, "act-estado");
+    }
+    const { d } = paquete;
+    const idLeido = await idDe(d);
+    if (mision) {
+      const p = act.todos.find((q) => q.id === idLeido);
+      if (!p) return estado(`${d.n} no aparece en esta misión. Los personajes de la misión son: ${act.todos.map((q) => q.n).join(", ")}.`, true, "act-estado");
+      Object.assign(act, p);
+      $("act-quien").textContent = [p.n, p.e].filter(Boolean).join(" · ");
+      if (p.res) $("act-resumen").textContent += " " + p.res;
+    } else if (idLeido !== act.id)
+      return estado(`Esa credencial no es la de ${act.n || "este personaje"}: el ID no coincide. Usa la credencial actual del personaje de la partida.`, true, "act-estado");
+    const previo = leerX(d.x);
+    if (mision && previo?.mi === mision.id) return estado("Esta misión ya está aplicada en esa credencial.", true, "act-estado");
+    if (!d.h) return estado("Esa credencial no tiene crew con contraseña, así que no se puede renovar.", true, "act-estado");
+    detenerCamara();
+    lista = { d, logo: fuenteDe(paquete.logo), foto: fuenteDe(paquete.foto) };
+    $("act-tabla").innerHTML = tablaComparativa(previo, act.st);
+    $("act-continuar").hidden = false;
+    estado(`Credencial de ${d.n} (crew ${d.c}) verificada. Revisa los cambios y continúa con la contraseña de la crew.`, false, "act-estado");
+  }
+  $("act-camara").onclick = () => usarCamara("act-video", "act-estado", alLeer);
+  $("act-archivo").onchange = async () => {
+    const f = $("act-archivo").files[0];
+    if (!f) return;
+    detenerCamara();
+    estado("Leyendo el QR…", false, "act-estado");
+    try {
+      const bmp = await createImageBitmap(f);
+      const t = await leerQr(bmp, bmp.width, bmp.height);
+      bmp.close();
+      if (!t) return estado("No encontré un QR en esa imagen. Prueba con una más nítida o más cerca.", true, "act-estado");
+      await alLeer(t);
+    } catch {
+      estado("No pude abrir esa imagen.", true, "act-estado");
+    }
+  };
+  $("act-usar-enlace").onclick = () => alLeer($("act-enlace").value);
+  $("act-continuar").onclick = () => lista && modoClave({ modo: "actualizar", ...lista, xNuevo: act.x });
+  mostrar("actualizar");
+}
+
+// ---------- Webapp: instalar y actualizar ----------
+// sw.js guarda los archivos del sitio para usarlo sin conexión (nunca datos de credenciales).
+// «Actualizar» sirve para dos cosas: aplicar el enlace que da el Explorador al terminar cada
+// partida (#X…) y buscar una versión nueva de la app.
+const instalada = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let registroSw = null;
+let recargarAlCambiar = false;
+
+function marcarVersionNueva() {
+  const hay = !!registroSw?.waiting;
+  document.querySelector("#boton-actualizar .punto-nuevo").hidden = !hay;
+  if (hay) estado("Hay una versión nueva de la app. Pulsa «Buscar versión nueva» para usarla.", false, "upd-app-estado");
+}
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker
+    .register("sw.js")
+    .then((r) => {
+      registroSw = r;
+      marcarVersionNueva();
+      r.addEventListener("updatefound", () => {
+        const nuevo = r.installing;
+        nuevo?.addEventListener("statechange", () => nuevo.state === "installed" && navigator.serviceWorker.controller && marcarVersionNueva());
+      });
+    })
+    .catch((e) => console.warn("Sin modo sin conexión:", e.message));
+  // Solo se recarga cuando lo pide el usuario (la primera instalación también cambia el controlador).
+  navigator.serviceWorker.addEventListener("controllerchange", () => recargarAlCambiar && location.reload());
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    if (e.data?.version) $("upd-version").textContent = `Versión instalada: ${e.data.version}. Con conexión, la app se actualiza sola; sin conexión usa la última copia guardada.`;
+  });
+}
+
+// Instalar: Chrome, Edge y Android ofrecen el aviso propio; en iPhone/iPad se explica cómo.
+let avisoInstalar = null;
+const esIos = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+$("boton-instalar").hidden = instalada() || !esIos;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  avisoInstalar = e;
+  $("boton-instalar").hidden = instalada();
+});
+window.addEventListener("appinstalled", () => {
+  avisoInstalar = null;
+  $("boton-instalar").hidden = true;
+});
+$("boton-instalar").onclick = async () => {
+  if (avisoInstalar) {
+    avisoInstalar.prompt();
+    await avisoInstalar.userChoice.catch(() => null);
+    avisoInstalar = null;
+    $("boton-instalar").hidden = true;
+    return;
+  }
+  $("instalar-pasos").textContent = esIos
+    ? "En Safari, toca el botón Compartir (el cuadrado con la flecha) y elige «Añadir a pantalla de inicio». La app queda con su ícono y funciona sin conexión."
+    : "Abre el menú del navegador y elige «Instalar app» o «Añadir a pantalla de inicio».";
+  $("dialogo-instalar").showModal();
+};
+$("instalar-cerrar").onclick = () => $("dialogo-instalar").close();
+
+// Diálogo «Actualizar»
+$("boton-actualizar").onclick = () => {
+  $("upd-enlace").value = "";
+  estado("", false, "upd-estado");
+  if (!registroSw?.waiting) estado("", false, "upd-app-estado");
+  $("upd-version").textContent = "serviceWorker" in navigator ? "" : "Este navegador no permite usar la app sin conexión.";
+  navigator.serviceWorker?.controller?.postMessage("version");
+  marcarVersionNueva();
+  $("dialogo-actualizar").showModal();
+  $("upd-enlace").focus();
+};
+$("upd-cerrar").onclick = () => {
+  detenerCamara();
+  $("dialogo-actualizar").close();
+};
+$("upd-pegar").onclick = async () => {
+  try {
+    $("upd-enlace").value = (await navigator.clipboard.readText()).trim();
+  } catch {
+    estado("No pude leer el portapapeles. Mantén pulsado el campo y elige Pegar.", true, "upd-estado");
+  }
+};
+// Acepta el enlace completo, solo el fragmento (#X…) o el código; también un enlace de credencial (#C…).
+$("upd-aplicar").onclick = () => {
+  const v = $("upd-enlace").value.trim();
+  const x = /(?:^|#)X([0-9A-Z$*+\-./:]+)$/.exec(v);
+  const c = /(?:^|#)C([0-9A-Z$*+\-./:]+)$/.exec(v);
+  if (!x && !c)
+    return estado("Eso no parece un enlace de partida. Cópialo completo desde el Explorador estelar (termina en #X…).", true, "upd-estado");
+  $("dialogo-actualizar").close();
+  if (x) modoActualizar(x[1]);
+  else modoVer(c[1]);
+};
+// QR general de fin de misión: con la cámara o subiendo la imagen.
+async function aplicarTextoMision(t) {
+  const x = /(?:^|#)X([0-9A-Z$*+\-./:]+)$/.exec(String(t ?? "").trim());
+  if (!x) return estado("Ese QR no es de una misión de la Carta Estelar.", true, "upd-estado");
+  detenerCamara();
+  $("dialogo-actualizar").close();
+  modoActualizar(x[1]);
+}
+$("upd-camara").onclick = () => usarCamara("upd-video", "upd-estado", aplicarTextoMision);
+$("upd-archivo").onchange = async () => {
+  const f = $("upd-archivo").files[0];
+  if (!f) return;
+  estado("Leyendo el QR…", false, "upd-estado");
+  try {
+    const bmp = await createImageBitmap(f);
+    const t = await leerQr(bmp, bmp.width, bmp.height);
+    bmp.close();
+    $("upd-archivo").value = "";
+    if (!t) return estado("No encontré un QR en esa imagen.", true, "upd-estado");
+    aplicarTextoMision(t);
+  } catch {
+    estado("No pude abrir esa imagen.", true, "upd-estado");
+  }
+};
+$("upd-buscar").onclick = async () => {
+  if (!registroSw) return estado("La app no tiene modo sin conexión en este navegador: recarga la página para tener la última versión.", true, "upd-app-estado");
+  const boton = $("upd-buscar");
+  boton.disabled = true;
+  estado("Buscando…", false, "upd-app-estado");
+  try {
+    await registroSw.update();
+    const nuevo = registroSw.installing;
+    if (nuevo)
+      await new Promise((ok) => nuevo.addEventListener("statechange", () => ["installed", "redundant", "activated"].includes(nuevo.state) && ok()));
+    if (registroSw.waiting) {
+      estado("Versión nueva lista. Recargando…", false, "upd-app-estado");
+      recargarAlCambiar = true;
+      registroSw.waiting.postMessage("activar");
+    } else estado("Ya tienes la última versión.", false, "upd-app-estado");
+  } catch {
+    estado("No pude buscar: revisa tu conexión.", true, "upd-app-estado");
+  } finally {
+    boton.disabled = false;
+  }
+};
+
 // ---------- Arranque ----------
 const m = /^#C([0-9A-Z$*+\-./:]+)$/.exec(location.hash);
+const mx = /^#X([0-9A-Z$*+\-./:]+)$/.exec(location.hash);
 if (m) modoVer(m[1]);
+else if (mx) modoActualizar(mx[1]); // actualización de personaje desde el Explorador estelar
 else modoClave({ modo: "fundar" }); // sin QR, lo único posible es fundar una crew
 window.addEventListener("hashchange", () => location.reload());

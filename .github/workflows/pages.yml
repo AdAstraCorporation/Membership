@@ -31,6 +31,9 @@ jobs:
           v="${GITHUB_SHA::8}"
           sed -i "s#src=\"app.js\"#src=\"app.js?v=$v\"#; s#href=\"style.css\"#href=\"style.css?v=$v\"#" index.html
           grep -n "?v=$v" index.html
+          # La webapp detecta la versión nueva porque sw.js cambia en cada publicación.
+          sed -i "s#const VERSION = \"dev\"#const VERSION = \"$v\"#" sw.js
+          grep -n "VERSION = \"$v\"" sw.js
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
