@@ -206,3 +206,19 @@ vendor/      html2canvas, qrcode-generator (MIT) y jsQR (Apache-2.0), se cargan 
 ```
 python3 -m http.server 8000
 ```
+
+## Fin de misión (QR general de la Carta Estelar)
+Al cerrar una misión, la Carta Estelar muestra **un solo QR** (o enlace `#X…`) para toda la tripulación. Cada jugador,
+desde la app: **Actualizar → Escanear QR de la misión** (o subir su imagen), y después escanea o sube su credencial. Members
+busca su personaje en la misión, muestra el antes/después y, con la contraseña de la crew, emite la credencial renovada.
+
+Formato (`#X` versión 2, deflate-raw + base43 de un JSON UTF-8):
+
+```json
+{"v":2,"mi":{"id":"HEX8","f":"AAAA-MM-DD","nave":"…","dn":730,"ye":2.1,"ly":24.2,"sj":3,"ss":5,"q":2},
+ "c":[{"id":"AA-XXXX","n":"Nombre","e":"Especie","x":"R1;…","dv":730,"res":"…"}]}
+```
+
+El campo `x` de cada personaje ya trae los valores finales y añade, antes de `t`, `fv=<días de vuelo acumulados>`,
+`ms=<misiones completadas>` y `mi=<código de la última misión>`. Una misión no se aplica dos veces a la misma credencial
+(se compara `mi`). La versión 1 (un personaje por enlace) se sigue aceptando.

@@ -200,7 +200,7 @@
   <main id="actualizar" class="ver" hidden>
     <div class="tarjeta-unirse tarjeta-ancha">
       <p class="eyebrow">Explorador estelar</p>
-      <h2>Actualización de personaje desde una partida</h2>
+      <h2 id="act-titulo">Actualización de personaje desde una partida</h2>
       <p id="act-quien" class="act-quien"></p>
       <blockquote id="act-resumen" class="resumen-partida"></blockquote>
       <div id="act-tabla"></div>
@@ -248,8 +248,14 @@
     <h2>Actualizar</h2>
     <section class="dialogo-seccion">
       <h3>Después de una partida</h3>
-      <p class="ayuda">Al terminar una partida, el Explorador estelar te da un enlace de actualización de tu
-        personaje. Pégalo aquí para renovar tu credencial con las estadísticas nuevas.</p>
+      <p class="ayuda">Al terminar una misión, la Carta Estelar muestra un QR general para toda la tripulación.
+        Escanéalo (o sube su imagen) y luego tu credencial: se renueva con tus estadísticas, tiempo de vuelo y misiones.</p>
+      <div class="opciones-qr">
+        <button type="button" id="upd-camara" class="boton">Escanear QR de la misión</button>
+        <label class="boton secundario">Subir imagen del QR
+          <input id="upd-archivo" type="file" accept="image/*" hidden></label>
+      </div>
+      <video id="upd-video" class="qr-video" playsinline muted hidden></video>
       <div class="fila-enlace">
         <input id="upd-enlace" type="text" placeholder="Enlace de la partida (…#X…)" aria-label="Enlace de la partida" autocomplete="off">
         <button type="button" id="upd-pegar" class="boton secundario">Pegar</button>

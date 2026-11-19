@@ -335,6 +335,8 @@ function limpiar(o) {
 // Sexto texto de la credencial (x), máx. 160 caracteres:
 //   R1;rol=<código>;ras=<Rasgo>;s=<pil>,<ing>,<cie>,<med>,<seg>,<soc>;lv=<nivel>;xp=<xp>;hp=<0-100>;mo=<0-100>;t=<semilla>.<nº>.<total>
 //   Ejemplo: R1;rol=cie;ras=Curioso;s=3,4,9,5,3,4;lv=1;xp=0;hp=100;mo=75;t=8F3A1C2B.1.21
+// Opcionales, añadidos por la Carta Estelar al cerrar una misión (van antes de t):
+//   fv=<días de vuelo acumulados>;ms=<misiones completadas>;mi=<código HEX8 de la última misión aplicada>
 // s guarda los valores repartidos SIN el bonus del rasgo (este se suma al mostrar).
 // Al crear: base 3, mín. 1, máx. 10. Al leer se aceptan 1-12 (mejoras ganadas en partida).
 const STATS = [
@@ -362,6 +364,14 @@ const STAT_MIN = 1;
 const STAT_MAX_CREAR = 10;
 const STAT_MAX_LEER = 12;
 const MAX_TIRADAS = 3; // la primera y dos repeticiones
+
+// Días de vuelo → texto corto («3 a 112 d», «45 d»).
+const vuelo = (d) => {
+  if (!d) return "sin vuelos";
+  let a = Math.floor(d / 365.25), r = Math.round(d - a * 365.25);
+  if (r >= 365) (a++, (r = 0));
+  return a ? `${a} año${a === 1 ? "" : "s"}${r ? ` y ${r} d` : ""}` : `${r} d`;
+};
 
 // Valor con el bonus del rasgo (solo para mostrar y para los derivados; nunca se guarda así).
 const bonusDe = (st, k) => RASGOS[st.ras]?.bonus[k] ?? 0;
@@ -395,6 +405,9 @@ function leerX(x) {
     t: null,
   };
   st.mo = entero(kv.mo, 0, 100) ?? Math.min(100, moralBase(st));
+  st.fv = entero(kv.fv, 0, 9999999) ?? 0;
+  st.ms = entero(kv.ms, 0, 99999) ?? 0;
+  st.mi = /^[0-9A-F]{8}$/.test(kv.mi ?? "") ? kv.mi : null;
   const t = /^([0-9A-Fa-f]{8})\.([1-9])\.(\d{1,2})$/.exec(kv.t ?? "");
   if (t) st.t = { sem: t[1].toUpperCase(), n: +t[2], total: +t[3] };
   return st;
@@ -403,7 +416,8 @@ function leerX(x) {
 // Objeto → texto x (orden y formato exactos del contrato).
 function escribirX(st) {
   const t = st.t ? `;t=${st.t.sem}.${st.t.n}.${st.t.total}` : "";
-  return `R1;rol=${st.rol};ras=${st.ras};s=${STATS.map(([k]) => st.s[k]).join(",")};lv=${st.lv};xp=${st.xp};hp=${st.hp};mo=${st.mo}${t}`;
+  const v = (st.fv ? `;fv=${st.fv}` : "") + (st.ms ? `;ms=${st.ms}` : "") + (st.mi ? `;mi=${st.mi}` : "");
+  return `R1;rol=${st.rol};ras=${st.ras};s=${STATS.map(([k]) => st.s[k]).join(",")};lv=${st.lv};xp=${st.xp};hp=${st.hp};mo=${st.mo}${v}${t}`;
 }
 
 // Tirada reproducible (no usa Math.random):
@@ -472,7 +486,7 @@ function fichaRol(d, st, { avance = "" } = {}) {
       ${cab}
       <div class="ficha-quien">
         <p class="ficha-nombre">${esc(d.n)}</p>
-        <p class="ficha-nivel">Nivel ${st.lv} · ${st.xp} XP</p>
+        <p class="ficha-nivel">Nivel ${st.lv} · ${st.xp} XP${st.fv || st.ms ? ` · ${vuelo(st.fv)} de vuelo · ${st.ms} misi${st.ms === 1 ? "ón" : "ones"}` : ""}</p>
       </div>
       <dl class="ficha-rol">
         <dt>Rol</dt><dd>${esc(ROLES[st.rol] ?? "—")}</dd>
@@ -1557,15 +1571,27 @@ function modoLeerQr() {
 //   {"v":1,"id":"AA-XXXX","n":"Nombre","e":"Especie","x":"R1;…","res":"resumen de la partida"}
 // id es el ID de miembro (idDe). Se aplica sobre la credencial actual, que hay que escanear o
 // subir: su ID tiene que coincidir. Luego se pide la contraseña de la crew, como al renovar.
+// v2 = QR general de fin de misión de la Carta Estelar (uno para toda la tripulación):
+//   {"v":2,"mi":{"id":"HEX8","f":"AAAA-MM-DD","nave":"…","dn":<días a bordo>,"ye":<años en la Tierra>,"ly":<años luz>,
+//    "sj":<saltos>,"ss":<sistemas>,"q":<misiones de historia>},"c":[{"id":"AA-XXXX","n","e","x":"R1;…","dv":<días de vuelo>,"res"}]}
+// Cada jugador escanea ese QR y después su credencial: se aplica la entrada cuyo id coincide.
 async function leerActualizacion(texto) {
   if (texto.length > 4400) throw new Error("demasiado largo");
   const j = JSON.parse(new TextDecoder().decode(await descomprimir(deBase43(texto))));
-  if (j?.v !== 1) throw new Error("versión desconocida");
-  if (typeof j.id !== "string" || !/^AA-[A-Z2-9]{4}$/.test(j.id)) throw new Error("sin ID");
-  const st = leerX(j.x);
-  if (!st || j.x.length > LIMITES.x) throw new Error("estadísticas inválidas");
   const txt = (v, max) => (typeof v === "string" ? v.trim().slice(0, max) : "");
-  return { id: j.id, n: txt(j.n, LIMITES.n), e: txt(j.e, LIMITES.e), st, x: escribirX(st), res: txt(j.res, 500) };
+  const persona = (p) => {
+    if (typeof p?.id !== "string" || !/^AA-[A-Z2-9]{4}$/.test(p.id)) throw new Error("sin ID");
+    const st = leerX(p.x);
+    if (!st || p.x.length > LIMITES.x) throw new Error("estadísticas inválidas");
+    return { id: p.id, n: txt(p.n, LIMITES.n), e: txt(p.e, LIMITES.e), st, x: escribirX(st), res: txt(p.res, 500), dv: entero(String(p.dv ?? 0), 0, 9999999) ?? 0 };
+  };
+  if (j?.v === 1) return { ...persona(j), mision: null, todos: null };
+  if (j?.v !== 2 || !Array.isArray(j.c) || !j.c.length || j.c.length > 12) throw new Error("versión desconocida");
+  const mi = j.mi ?? {};
+  if (!/^[0-9A-F]{8}$/.test(mi.id ?? "")) throw new Error("misión sin código");
+  const num = (v) => (Number.isFinite(+v) && +v >= 0 ? +v : 0);
+  const mision = { id: mi.id, f: txt(mi.f, 10), nave: txt(mi.nave, 60), dn: num(mi.dn), ye: num(mi.ye), ly: num(mi.ly), sj: num(mi.sj), ss: num(mi.ss), q: num(mi.q) };
+  return { mision, todos: j.c.map(persona) };
 }
 
 // Tabla: estadísticas anteriores (si ya se leyó la credencial) frente a las nuevas.
@@ -1577,6 +1603,8 @@ function tablaComparativa(antes, nueva) {
     ...STATS.map(([k, nombre]) => [nombre, (st) => celda(st, k), k]),
     ["Nivel", (st) => st.lv],
     ["XP", (st) => st.xp],
+    ["Tiempo de vuelo", (st) => vuelo(st.fv)],
+    ["Misiones", (st) => st.ms],
     ["Salud", (st) => `${st.hp}% de ${saludMax(st)}`],
     ["Moral", (st) => st.mo],
   ];
@@ -1598,10 +1626,21 @@ async function modoActualizar(texto) {
     $("error").querySelector(".vacio").textContent = "Este enlace no trae una actualización de personaje válida.";
     return mostrar("error");
   }
-  document.title = `Actualizar a ${act.n || "tu personaje"} · Corporación Ad Astra`;
-  $("act-quien").textContent = [act.n, act.e].filter(Boolean).join(" · ");
-  $("act-resumen").textContent = act.res || "La partida no trae resumen.";
-  $("act-tabla").innerHTML = tablaComparativa(undefined, act.st);
+  const mision = act.mision;
+  if (mision) {
+    const m = mision;
+    document.title = "Fin de misión · Corporación Ad Astra";
+    $("act-titulo").textContent = "Fin de misión: actualiza tu personaje";
+    $("act-quien").textContent = `Tripulación: ${act.todos.map((p) => p.n).join(", ")}`;
+    $("act-resumen").textContent = `Misión ${m.id}${m.f ? ` del ${m.f}` : ""}${m.nave ? ` a bordo de ${m.nave}` : ""}: ${vuelo(Math.round(m.dn))} a bordo, ${m.ye.toFixed(1)} años en la Tierra, ${m.ly.toFixed(1)} años luz, ${m.sj} saltos, ${m.ss} sistemas registrados.`;
+    $("act-tabla").innerHTML = "";
+  } else {
+    document.title = `Actualizar a ${act.n || "tu personaje"} · Corporación Ad Astra`;
+    $("act-titulo").textContent = "Actualización de personaje desde una partida";
+    $("act-quien").textContent = [act.n, act.e].filter(Boolean).join(" · ");
+    $("act-resumen").textContent = act.res || "La partida no trae resumen.";
+    $("act-tabla").innerHTML = tablaComparativa(undefined, act.st);
+  }
   $("act-continuar").hidden = true;
   $("act-enlace").value = "";
   $("act-archivo").value = "";
@@ -1619,12 +1658,21 @@ async function modoActualizar(texto) {
       return estado("Leí la credencial, pero viene incompleta o dañada.", true, "act-estado");
     }
     const { d } = paquete;
-    if ((await idDe(d)) !== act.id)
+    const idLeido = await idDe(d);
+    if (mision) {
+      const p = act.todos.find((q) => q.id === idLeido);
+      if (!p) return estado(`${d.n} no aparece en esta misión. Los personajes de la misión son: ${act.todos.map((q) => q.n).join(", ")}.`, true, "act-estado");
+      Object.assign(act, p);
+      $("act-quien").textContent = [p.n, p.e].filter(Boolean).join(" · ");
+      if (p.res) $("act-resumen").textContent += " " + p.res;
+    } else if (idLeido !== act.id)
       return estado(`Esa credencial no es la de ${act.n || "este personaje"}: el ID no coincide. Usa la credencial actual del personaje de la partida.`, true, "act-estado");
+    const previo = leerX(d.x);
+    if (mision && previo?.mi === mision.id) return estado("Esta misión ya está aplicada en esa credencial.", true, "act-estado");
     if (!d.h) return estado("Esa credencial no tiene crew con contraseña, así que no se puede renovar.", true, "act-estado");
     detenerCamara();
     lista = { d, logo: fuenteDe(paquete.logo), foto: fuenteDe(paquete.foto) };
-    $("act-tabla").innerHTML = tablaComparativa(leerX(d.x), act.st);
+    $("act-tabla").innerHTML = tablaComparativa(previo, act.st);
     $("act-continuar").hidden = false;
     estado(`Credencial de ${d.n} (crew ${d.c}) verificada. Revisa los cambios y continúa con la contraseña de la crew.`, false, "act-estado");
   }
@@ -1721,7 +1769,10 @@ $("boton-actualizar").onclick = () => {
   $("dialogo-actualizar").showModal();
   $("upd-enlace").focus();
 };
-$("upd-cerrar").onclick = () => $("dialogo-actualizar").close();
+$("upd-cerrar").onclick = () => {
+  detenerCamara();
+  $("dialogo-actualizar").close();
+};
 $("upd-pegar").onclick = async () => {
   try {
     $("upd-enlace").value = (await navigator.clipboard.readText()).trim();
@@ -1739,6 +1790,30 @@ $("upd-aplicar").onclick = () => {
   $("dialogo-actualizar").close();
   if (x) modoActualizar(x[1]);
   else modoVer(c[1]);
+};
+// QR general de fin de misión: con la cámara o subiendo la imagen.
+async function aplicarTextoMision(t) {
+  const x = /(?:^|#)X([0-9A-Z$*+\-./:]+)$/.exec(String(t ?? "").trim());
+  if (!x) return estado("Ese QR no es de una misión de la Carta Estelar.", true, "upd-estado");
+  detenerCamara();
+  $("dialogo-actualizar").close();
+  modoActualizar(x[1]);
+}
+$("upd-camara").onclick = () => usarCamara("upd-video", "upd-estado", aplicarTextoMision);
+$("upd-archivo").onchange = async () => {
+  const f = $("upd-archivo").files[0];
+  if (!f) return;
+  estado("Leyendo el QR…", false, "upd-estado");
+  try {
+    const bmp = await createImageBitmap(f);
+    const t = await leerQr(bmp, bmp.width, bmp.height);
+    bmp.close();
+    $("upd-archivo").value = "";
+    if (!t) return estado("No encontré un QR en esa imagen.", true, "upd-estado");
+    aplicarTextoMision(t);
+  } catch {
+    estado("No pude abrir esa imagen.", true, "upd-estado");
+  }
 };
 $("upd-buscar").onclick = async () => {
   if (!registroSw) return estado("La app no tiene modo sin conexión en este navegador: recarga la página para tener la última versión.", true, "upd-app-estado");
