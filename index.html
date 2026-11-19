@@ -8,12 +8,24 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none'">
   <title>Credencial · Corporación Ad Astra</title>
   <link rel="icon" href="favicon.png" type="image/png">
+  <!-- Webapp instalable (funciona sin conexión gracias a sw.js) -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f1115">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ad Astra">
   <link rel="stylesheet" href="style.css">
   <link rel="preload" href="logo.png" as="image">
 </head>
 <body>
   <header class="cabecera">
     <a class="marca" href="./"><img class="logo" src="logo.png" alt=""> Corporación Ad Astra</a>
+    <nav class="cabecera-acciones">
+      <button type="button" id="boton-instalar" class="boton secundario chico" hidden>Instalar app</button>
+      <button type="button" id="boton-actualizar" class="boton chico">Actualizar<span class="punto-nuevo" hidden></span></button>
+    </nav>
   </header>
 
 
@@ -229,6 +241,36 @@
     </div>
     <small class="ayuda">Si eliges por separado y el navegador pregunta, acepta descargar varios archivos.</small>
     <button type="button" class="boton secundario" data-formato="cancelar">Cancelar</button>
+  </dialog>
+
+  <!-- Actualizar: aplicar la partida del Explorador y buscar versión nueva de la app -->
+  <dialog id="dialogo-actualizar" class="dialogo">
+    <h2>Actualizar</h2>
+    <section class="dialogo-seccion">
+      <h3>Después de una partida</h3>
+      <p class="ayuda">Al terminar una partida, el Explorador estelar te da un enlace de actualización de tu
+        personaje. Pégalo aquí para renovar tu credencial con las estadísticas nuevas.</p>
+      <div class="fila-enlace">
+        <input id="upd-enlace" type="text" placeholder="Enlace de la partida (…#X…)" aria-label="Enlace de la partida" autocomplete="off">
+        <button type="button" id="upd-pegar" class="boton secundario">Pegar</button>
+      </div>
+      <button type="button" id="upd-aplicar" class="boton">Aplicar la partida</button>
+      <p id="upd-estado" class="estado" role="status"></p>
+    </section>
+    <section class="dialogo-seccion">
+      <h3>La app</h3>
+      <p id="upd-version" class="ayuda"></p>
+      <button type="button" id="upd-buscar" class="boton secundario">Buscar versión nueva</button>
+      <p id="upd-app-estado" class="estado" role="status"></p>
+    </section>
+    <button type="button" id="upd-cerrar" class="boton secundario">Cerrar</button>
+  </dialog>
+
+  <!-- Instalar en iPhone/iPad o en navegadores sin instalación automática -->
+  <dialog id="dialogo-instalar" class="dialogo">
+    <h2>Instalar la app</h2>
+    <p id="instalar-pasos" class="ayuda"></p>
+    <button type="button" id="instalar-cerrar" class="boton secundario">Entendido</button>
   </dialog>
 
   <script src="vendor/qrcode.min.js" defer></script>

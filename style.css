@@ -364,3 +364,16 @@ fieldset { min-width: 0; }
 .tarjeta-unirse a.boton { text-align: center; }
 /* Bonus del rasgo: color sólido atenuado (html2canvas no dibuja degradados repetidos en el PNG) */
 .stat-barra b, .ficha-leyenda b { background: var(--crew); opacity: .45; border: 0; box-shadow: none; }
+
+/* ---------- Webapp: instalar y actualizar ---------- */
+.cabecera-acciones { display: flex; gap: .5rem; align-items: center; }
+.boton.chico { padding: .45rem .85rem; font-size: .88rem; position: relative; }
+.punto-nuevo { position: absolute; top: -4px; right: -4px; width: 11px; height: 11px; border-radius: 50%; background: #d08a80; box-shadow: 0 0 0 2px var(--fondo); }
+.dialogo-seccion { display: flex; flex-direction: column; gap: .7rem; padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--borde); }
+.dialogo-seccion h3 { margin: 0; font-size: .8rem; letter-spacing: .15em; text-transform: uppercase; color: var(--acento); font-weight: 500; }
+.dialogo-seccion p { margin: 0; }
+.dialogo .estado { word-break: normal; font-size: .88rem; }
+#instalar-pasos { line-height: 1.6; margin: 0 0 1rem; }
+@media (max-width: 560px) { .marca { font-size: 1rem; } .cabecera-acciones { gap: .35rem; } .boton.chico { padding: .4rem .65rem; font-size: .82rem; } }
+@media (display-mode: standalone) { .cabecera { padding-top: max(1rem, env(safe-area-inset-top)); } }
+@media print { .cabecera-acciones { display: none !important; } }

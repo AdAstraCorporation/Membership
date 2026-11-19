@@ -64,6 +64,17 @@ vista muestra el frente y la ficha de rol; las descargas incluyen además el rev
     que no renueva, tiene para eso el botón *Completar estadísticas*.
   - El campo del texto libre que antes se llamaba «Rol» ahora es **Cargo en la crew** (Capitán,
     Líder…); el rol de juego es aparte.
+- **Webapp instalable.** Se puede instalar en el celular o el computador:
+  - *Instalar app* aparece en la cabecera cuando el navegador lo permite (Chrome, Edge, Android).
+    En iPhone/iPad explica cómo hacerlo desde Safari (Compartir → *Añadir a pantalla de inicio*).
+  - Funciona sin conexión: `sw.js` guarda solo los archivos del sitio, nunca credenciales ni
+    imágenes externas. Con conexión usa siempre la versión publicada (red primero).
+- **Actualizar** (botón de la cabecera):
+  - *Después de una partida:* se pega el enlace que da el Explorador estelar (`…#X…`). Abre la
+    actualización de personaje, igual que al abrir ese enlace. También acepta un enlace `#C…`.
+  - *La app:* busca una versión nueva y, si la hay, la aplica y recarga. El punto rojo del botón
+    avisa cuando ya se descargó una. El workflow de Pages pone el commit en `sw.js` en cada
+    publicación, y así se detecta la versión nueva.
 - **Imágenes por enlace.** En vez de subir la foto o el logo se puede poner un enlace `https`.
   Entonces el QR guarda solo la dirección (unos pocos bytes en lugar de ~1,5 KB): mucho más
   liviano y la imagen se ve en su calidad original, GIF incluidos. Depende de que el enlace siga
@@ -184,6 +195,8 @@ index.html   página
 app.js       lógica: formularios, empaquetado, QR, estilos, PNG y PDF
 style.css    estilos de la página y de la credencial
 logo.png     emblema   favicon.png  icono
+manifest.webmanifest, sw.js   webapp instalable y sin conexión
+icon-192.png, icon-512.png, icon-maskable.png, apple-touch-icon.png   íconos de la app
 vendor/      html2canvas, qrcode-generator (MIT) y jsQR (Apache-2.0), se cargan solo al usarse
 .github/workflows/pages.yml   publica la raíz en Pages en cada push a main
 ```

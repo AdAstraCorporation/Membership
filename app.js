@@ -1649,6 +1649,119 @@ async function modoActualizar(texto) {
   mostrar("actualizar");
 }
 
+// ---------- Webapp: instalar y actualizar ----------
+// sw.js guarda los archivos del sitio para usarlo sin conexión (nunca datos de credenciales).
+// «Actualizar» sirve para dos cosas: aplicar el enlace que da el Explorador al terminar cada
+// partida (#X…) y buscar una versión nueva de la app.
+const instalada = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let registroSw = null;
+let recargarAlCambiar = false;
+
+function marcarVersionNueva() {
+  const hay = !!registroSw?.waiting;
+  document.querySelector("#boton-actualizar .punto-nuevo").hidden = !hay;
+  if (hay) estado("Hay una versión nueva de la app. Pulsa «Buscar versión nueva» para usarla.", false, "upd-app-estado");
+}
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker
+    .register("sw.js")
+    .then((r) => {
+      registroSw = r;
+      marcarVersionNueva();
+      r.addEventListener("updatefound", () => {
+        const nuevo = r.installing;
+        nuevo?.addEventListener("statechange", () => nuevo.state === "installed" && navigator.serviceWorker.controller && marcarVersionNueva());
+      });
+    })
+    .catch((e) => console.warn("Sin modo sin conexión:", e.message));
+  // Solo se recarga cuando lo pide el usuario (la primera instalación también cambia el controlador).
+  navigator.serviceWorker.addEventListener("controllerchange", () => recargarAlCambiar && location.reload());
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    if (e.data?.version) $("upd-version").textContent = `Versión instalada: ${e.data.version}. Con conexión, la app se actualiza sola; sin conexión usa la última copia guardada.`;
+  });
+}
+
+// Instalar: Chrome, Edge y Android ofrecen el aviso propio; en iPhone/iPad se explica cómo.
+let avisoInstalar = null;
+const esIos = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+$("boton-instalar").hidden = instalada() || !esIos;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  avisoInstalar = e;
+  $("boton-instalar").hidden = instalada();
+});
+window.addEventListener("appinstalled", () => {
+  avisoInstalar = null;
+  $("boton-instalar").hidden = true;
+});
+$("boton-instalar").onclick = async () => {
+  if (avisoInstalar) {
+    avisoInstalar.prompt();
+    await avisoInstalar.userChoice.catch(() => null);
+    avisoInstalar = null;
+    $("boton-instalar").hidden = true;
+    return;
+  }
+  $("instalar-pasos").textContent = esIos
+    ? "En Safari, toca el botón Compartir (el cuadrado con la flecha) y elige «Añadir a pantalla de inicio». La app queda con su ícono y funciona sin conexión."
+    : "Abre el menú del navegador y elige «Instalar app» o «Añadir a pantalla de inicio».";
+  $("dialogo-instalar").showModal();
+};
+$("instalar-cerrar").onclick = () => $("dialogo-instalar").close();
+
+// Diálogo «Actualizar»
+$("boton-actualizar").onclick = () => {
+  $("upd-enlace").value = "";
+  estado("", false, "upd-estado");
+  if (!registroSw?.waiting) estado("", false, "upd-app-estado");
+  $("upd-version").textContent = "serviceWorker" in navigator ? "" : "Este navegador no permite usar la app sin conexión.";
+  navigator.serviceWorker?.controller?.postMessage("version");
+  marcarVersionNueva();
+  $("dialogo-actualizar").showModal();
+  $("upd-enlace").focus();
+};
+$("upd-cerrar").onclick = () => $("dialogo-actualizar").close();
+$("upd-pegar").onclick = async () => {
+  try {
+    $("upd-enlace").value = (await navigator.clipboard.readText()).trim();
+  } catch {
+    estado("No pude leer el portapapeles. Mantén pulsado el campo y elige Pegar.", true, "upd-estado");
+  }
+};
+// Acepta el enlace completo, solo el fragmento (#X…) o el código; también un enlace de credencial (#C…).
+$("upd-aplicar").onclick = () => {
+  const v = $("upd-enlace").value.trim();
+  const x = /(?:^|#)X([0-9A-Z$*+\-./:]+)$/.exec(v);
+  const c = /(?:^|#)C([0-9A-Z$*+\-./:]+)$/.exec(v);
+  if (!x && !c)
+    return estado("Eso no parece un enlace de partida. Cópialo completo desde el Explorador estelar (termina en #X…).", true, "upd-estado");
+  $("dialogo-actualizar").close();
+  if (x) modoActualizar(x[1]);
+  else modoVer(c[1]);
+};
+$("upd-buscar").onclick = async () => {
+  if (!registroSw) return estado("La app no tiene modo sin conexión en este navegador: recarga la página para tener la última versión.", true, "upd-app-estado");
+  const boton = $("upd-buscar");
+  boton.disabled = true;
+  estado("Buscando…", false, "upd-app-estado");
+  try {
+    await registroSw.update();
+    const nuevo = registroSw.installing;
+    if (nuevo)
+      await new Promise((ok) => nuevo.addEventListener("statechange", () => ["installed", "redundant", "activated"].includes(nuevo.state) && ok()));
+    if (registroSw.waiting) {
+      estado("Versión nueva lista. Recargando…", false, "upd-app-estado");
+      recargarAlCambiar = true;
+      registroSw.waiting.postMessage("activar");
+    } else estado("Ya tienes la última versión.", false, "upd-app-estado");
+  } catch {
+    estado("No pude buscar: revisa tu conexión.", true, "upd-app-estado");
+  } finally {
+    boton.disabled = false;
+  }
+};
+
 // ---------- Arranque ----------
 const m = /^#C([0-9A-Z$*+\-./:]+)$/.exec(location.hash);
 const mx = /^#X([0-9A-Z$*+\-./:]+)$/.exec(location.hash);
